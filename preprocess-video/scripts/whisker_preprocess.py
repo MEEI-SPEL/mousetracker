@@ -77,9 +77,12 @@ def __check_requirements():
 
 def __validate_args(args: dict):
     if not path.isfile(args['--input']):
-        error('{0} not found!'.format(args['--input']))
+        raise FileNotFoundError('{0} not found!'.format(args['--input']))
+    else:
+        if not args['--output']:
+            args['--output'] = path.split(args['--input'])[0]
     if not access(args['--output'], W_OK):
-        error('{0} is not writable!'.format(args['--output']))
+        raise PermissionError('{0} is not writable!'.format(args['--output']))
 
     if not args["--verbose"]:
         getLogger().setLevel(ERROR)
