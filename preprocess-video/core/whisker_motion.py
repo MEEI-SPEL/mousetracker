@@ -1,4 +1,6 @@
 from .extractor import Extractor
+from .base import avidemuxPath, ffmpegPath
+import shutil
 
 
 class WhiskerMotion(Extractor):
