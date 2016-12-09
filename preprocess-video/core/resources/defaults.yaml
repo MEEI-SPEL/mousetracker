@@ -1,0 +1,5 @@
+Camera:
+  pixel_width: 1080
+  pixel_height: 720
+  resolution: 720
+  framerate: 240
