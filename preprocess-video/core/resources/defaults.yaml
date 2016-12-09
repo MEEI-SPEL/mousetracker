@@ -1,5 +1,7 @@
-Camera:
-  pixel_width: 1080
-  pixel_height: 720
-  resolution: 720
+# operational defaults to describe hardware components in the system.
+
+# the optical specifications
+camera:
+  width: 1080
+  height: 720
   framerate: 240
