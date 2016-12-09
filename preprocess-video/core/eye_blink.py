@@ -10,3 +10,9 @@ class EyeBlink(Extractor):
     def extract_all(self):
         pass
 
+    def save_left(self):
+        pass
+
+    def save_right(self):
+        pass
+
