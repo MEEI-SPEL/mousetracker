@@ -22,7 +22,7 @@ import platform
 from docopt import docopt
 import yaml
 from core._version import __version__
-from core.base import modulePath
+from core.base import *
 from core.whisker_motion import WhiskerMotion
 from core.eye_blink import EyeBlink
 from logging import info, error, getLogger, ERROR
@@ -63,9 +63,9 @@ def __check_requirements():
     system = platform.system().casefold()
     retval = ""
     if system == "windows":
-        if not path.isfile(path.join(environ['PROGRAMFILES'], 'Avidemux 2.6 - 64 bits', 'avidemux_cli.exe')):
+        if not path.isfile(avidemuxPath):
             retval += "Avidemux not found \n"
-        if not path.isfile(path.join(modulePath, 'resources', 'ffmpeg-win64', 'bin', 'ffmpeg.exe')):
+        if not path.isfile(ffmpegPath):
             retval += "ffmpeg not found\n"
     else:
         retval += "This operating system is not supported (windows only for now)"
@@ -76,6 +76,12 @@ def __check_requirements():
 
 
 def __validate_args(args: dict):
+    """
+    Makes sure the arguments passed in are reasonable.  Sets the default value for output, if required.  Configures
+    logging level.
+    :param args:
+    :return:
+    """
     if not path.isfile(args['--input']):
         raise FileNotFoundError('{0} not found!'.format(args['--input']))
     else:
