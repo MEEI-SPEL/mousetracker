@@ -47,8 +47,9 @@ def main(inputargs):
     # Return whisker data from file.
     sparams = __parse_yaml()['system']
     call = [sparams['python27_path'], sparams['trace_path'], '--input', 'C:\\Users\\VoyseyG\\Downloads\\movie.whiskers']
-    whisk_data = subprocess.run(call, stdout=subprocess.PIPE)
-    whisk_data = loads(whisk_data.stdout)
+    whisk_data = subprocess.check_output(call)
+    whisk_data = loads(whisk_data.decode('utf-8'))
+    print(whisk_data[0])
 
 
 
