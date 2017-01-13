@@ -5,3 +5,11 @@ camera:
   width: 1080
   height: 720
   framerate: 240
+# the subject specifications
+animal:
+  species: 'rat'
+  color:  'white'
+# runtime constants
+system:
+  python27_path: 'C:\\Python27\\python.exe'
+  trace_path: 'C:\\Users\\VoyseyG\\Projects\\whisk\\python\\trace.py'
