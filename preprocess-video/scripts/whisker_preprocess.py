@@ -27,7 +27,7 @@ from core.whisker_motion import WhiskerMotion
 from core.eye_blink import EyeBlink
 from logging import info, error, getLogger, ERROR
 import subprocess
-from json_tricks import loads
+import json
 
 
 def main(inputargs):
@@ -48,8 +48,8 @@ def main(inputargs):
     sparams = __parse_yaml()['system']
     call = [sparams['python27_path'], sparams['trace_path'], '--input', 'C:\\Users\\VoyseyG\\Downloads\\movie.whiskers']
     whisk_data = subprocess.check_output(call)
-    whisk_data = loads(whisk_data.decode('utf-8'))
-    print(whisk_data[0])
+    whisk_data = json.loads(whisk_data.decode('utf-8'))
+
 
 
 
