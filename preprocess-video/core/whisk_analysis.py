@@ -1,12 +1,17 @@
 import numpy as np
 import pandas as pd
 import json
+from os import path, makedirs
+from datetime import datetime
 from collections import OrderedDict, namedtuple
+import matplotlib
+from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
-plt.style.use('fivethirtyeight')
 import seaborn as sns
+
+plt.style.use('fivethirtyeight')
+matplotlib.use('PDF')
 sns.set(color_codes=True)
-import scipy.stats as st
 
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")
 
@@ -15,10 +20,22 @@ def test_serialized(pth: str):
     with open(pth, 'r') as _:
         whiskdat = json.load(_, object_pairs_hook=OrderedDict)
     timeseries = analyze_stack(whiskdat)
-    timeseries.to_pickle('timeseries.pkl')
-    #plt.figure()
-    timeseries.plot.line(x='frameid', y='mean_degrees', yerr='stderr')
-    plt.show()
+    save(path.join(path.expanduser('~'), 'Documents', 'whisk_analysis_data'), timeseries)
+
+
+def save(rootdirpath: str, df: pd.DataFrame):
+    now = datetime.now().strftime('%d%b%y-%H%M%S')
+    dirpath = path.join(rootdirpath, now)
+    if not path.exists(dirpath):
+        makedirs(dirpath, exist_ok=True)
+    df.to_csv(path.join(dirpath, df.name + ".csv"), index=False)
+    with PdfPages(filename=path.join(dirpath, df.name + ".pdf")) as pdf:
+
+        ax = df.plot.line(x='frameid', y='mean_degrees', yerr='stderr')
+        fig = ax.get_figure()
+        fig.dpi = 400
+
+        pdf.savefig(fig)
 
 
 def analyze_stack(whiskdat: {}) -> pd.DataFrame:
@@ -30,14 +47,15 @@ def analyze_stack(whiskdat: {}) -> pd.DataFrame:
             thisy = whisker['y']['__ndarray__']
             degrees.append(compute_vector_angle(thisx, thisy))
         mean_degrees = np.mean(degrees)
-        stderr = np.std(degrees)/np.sqrt(len(degrees))
+        stderr = np.std(degrees) / np.sqrt(len(degrees))
         retval.append(timedata(frameid=int(frameID),
                                mean_degrees=mean_degrees,
                                num_whiskers=len(degrees),
                                stderr=stderr))
 
-
-    return pd.DataFrame(retval).sort('frameid')
+    retval = pd.DataFrame(retval).sort('frameid')
+    retval.name = "foo"
+    return retval
 
 
 def compute_vector_angle(x: list, y: list) -> float:
