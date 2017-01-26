@@ -28,6 +28,9 @@ from core.eye_blink import EyeBlink
 from logging import info, error, getLogger, ERROR
 import subprocess
 import json
+from collections import OrderedDict
+import numpy as np
+from core.whisk_analysis import test_serialized
 
 
 def main(inputargs):
@@ -44,13 +47,13 @@ def main(inputargs):
     WhiskerMotion(infile=args['--input'], outfile=args['--output'], camera_params=camera_parameters).extract_all()
     EyeBlink(infile=args['--input'], outfile=args['--output'], camera_params=camera_parameters).extract_all()
 
+    test_serialized('test.json')
     # Return whisker data from file.
-    sparams = __parse_yaml()['system']
-    call = [sparams['python27_path'], sparams['trace_path'], '--input', 'C:\\Users\\VoyseyG\\Downloads\\movie.whiskers']
-    whisk_data = subprocess.check_output(call)
-    whisk_data = json.loads(whisk_data.decode('utf-8'))
-
-
+    # sparams = __parse_yaml()['system']
+    # call = [sparams['python27_path'], sparams['trace_path'], '--input', 'C:\\Users\\VoyseyG\\Downloads\\movie.whiskers']
+    # info('extracting whisker movement for file {0}', '')
+    # whisk_data = subprocess.check_output(call)
+    # whisk_data = json.loads(whisk_data.decode('utf-8'))
 
 
 def __parse_yaml(location: str = None) -> dict:
