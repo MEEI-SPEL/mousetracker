@@ -47,7 +47,7 @@ def main(inputargs):
     WhiskerMotion(infile=args['--input'], outfile=args['--output'], camera_params=camera_parameters).extract_all()
     EyeBlink(infile=args['--input'], outfile=args['--output'], camera_params=camera_parameters).extract_all()
 
-    test_serialized('test.json')
+    test_serialized('test.json', camera_parameters)
     # Return whisker data from file.
     # sparams = __parse_yaml()['system']
     # call = [sparams['python27_path'], sparams['trace_path'], '--input', 'C:\\Users\\VoyseyG\\Downloads\\movie.whiskers']

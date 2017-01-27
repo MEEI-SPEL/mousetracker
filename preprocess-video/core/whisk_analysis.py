@@ -8,7 +8,7 @@ import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+from .util.filters import butter_bandpass_filter
 plt.style.use('fivethirtyeight')
 matplotlib.use('PDF')
 sns.set(color_codes=True)
@@ -16,10 +16,10 @@ sns.set(color_codes=True)
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")
 
 
-def test_serialized(pth: str):
+def test_serialized(pth: str, params:dict):
     with open(pth, 'r') as _:
         whiskdat = json.load(_, object_pairs_hook=OrderedDict)
-    timeseries = analyze_stack(whiskdat)
+    timeseries = analyze_stack(whiskdat, params)
     save(path.join(path.expanduser('~'), 'Documents', 'whisk_analysis_data'), timeseries)
 
 
@@ -30,15 +30,14 @@ def save(rootdirpath: str, df: pd.DataFrame):
         makedirs(dirpath, exist_ok=True)
     df.to_csv(path.join(dirpath, df.name + ".csv"), index=False)
     with PdfPages(filename=path.join(dirpath, df.name + ".pdf")) as pdf:
-
         ax = df.plot.line(x='frameid', y='mean_degrees', yerr='stderr')
         fig = ax.get_figure()
         fig.dpi = 400
-
+        fig.figsize = (8.5, 11)
         pdf.savefig(fig)
 
 
-def analyze_stack(whiskdat: {}) -> pd.DataFrame:
+def analyze_stack(whiskdat: {}, params:dict) -> pd.DataFrame:
     retval = []
     for frameID, frame in whiskdat.items():
         degrees = []
@@ -54,7 +53,12 @@ def analyze_stack(whiskdat: {}) -> pd.DataFrame:
                                stderr=stderr))
 
     retval = pd.DataFrame(retval).sort('frameid')
-    retval.name = "foo"
+    low = 0.1
+    high = 50
+    fs = params['framerate']
+    retval = retval.assign(mean_degrees_filtered=butter_bandpass_filter(retval['mean_degrees'], low, high, fs))
+    retval = retval.assign(time=retval['frameid']/params['framerate'])
+    retval.name = 'foo'
     return retval
 
 
