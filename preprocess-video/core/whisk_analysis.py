@@ -9,14 +9,29 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import seaborn as sns
 from .util.filters import butter_bandpass_filter
+
 plt.style.use('fivethirtyeight')
 matplotlib.use('PDF')
 sns.set(color_codes=True)
 
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")
 
+def plot_left_right(left, right, fp):
+    with PdfPages(filename=fp) as pdf:
 
-def test_serialized(pth: str, params:dict):
+        ax = left.plot.line(x='time', y='mean_degrees_filtered')
+        right.plot.line(ax=ax, x='time', y='mean_degrees_filtered')
+        fig = ax.get_figure()
+        fig.dpi = 400
+        fig.figsize = (8.5, 11)
+        pdf.savefig(fig)
+
+def serialized(json_data, params):
+    timeseries = analyze_stack(json_data, params)
+    return save(path.join(path.expanduser('~'), 'Documents', 'whisk_analysis_data'), timeseries)
+
+
+def test_serialized(pth: str, params: dict):
     with open(pth, 'r') as _:
         whiskdat = json.load(_, object_pairs_hook=OrderedDict)
     timeseries = analyze_stack(whiskdat, params)
@@ -35,9 +50,10 @@ def save(rootdirpath: str, df: pd.DataFrame):
         fig.dpi = 400
         fig.figsize = (8.5, 11)
         pdf.savefig(fig)
+    return df
 
 
-def analyze_stack(whiskdat: {}, params:dict) -> pd.DataFrame:
+def analyze_stack(whiskdat: {}, params: dict) -> pd.DataFrame:
     retval = []
     for frameID, frame in whiskdat.items():
         degrees = []
@@ -53,12 +69,14 @@ def analyze_stack(whiskdat: {}, params:dict) -> pd.DataFrame:
                                stderr=stderr))
 
     retval = pd.DataFrame(retval).sort('frameid')
-    low = 0.1
+    retval['mean_degrees'] = retval['mean_degrees'].replace(np.nan, 0, regex=True)
+    low = 2
     high = 50
     fs = params['framerate']
+
     retval = retval.assign(mean_degrees_filtered=butter_bandpass_filter(retval['mean_degrees'], low, high, fs))
-    retval = retval.assign(time=retval['frameid']/params['framerate'])
-    retval.name = 'foo'
+    retval = retval.assign(time=retval['frameid'] / params['framerate'])
+    retval.name = params['name']
     return retval
 
 
@@ -72,8 +90,8 @@ def compute_vector_angle(x: list, y: list) -> float:
     # normalize
     x_end = x[-1] - x[0]
     y_end = y[-1] - y[0]
-    retval = np.arctan(y_end / x_end)
-    if not np.isnan(retval):
+    try:
+        retval = np.arctan(y_end / x_end)
         return np.degrees(retval)
-    else:
-        raise ArithmeticError('error calculating whisker angle')
+    except ZeroDivisionError:
+        return np.nan

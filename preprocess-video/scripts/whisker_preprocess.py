@@ -30,7 +30,7 @@ import subprocess
 import json
 from collections import OrderedDict
 import numpy as np
-from core.whisk_analysis import test_serialized
+from core.whisk_analysis import serialized, plot_left_right
 
 
 def main(inputargs):
@@ -47,13 +47,27 @@ def main(inputargs):
     WhiskerMotion(infile=args['--input'], outfile=args['--output'], camera_params=camera_parameters).extract_all()
     EyeBlink(infile=args['--input'], outfile=args['--output'], camera_params=camera_parameters).extract_all()
 
-    test_serialized('test.json', camera_parameters)
+    # test_serialized('test.json', camera_parameters)
     # Return whisker data from file.
-    # sparams = __parse_yaml()['system']
-    # call = [sparams['python27_path'], sparams['trace_path'], '--input', 'C:\\Users\\VoyseyG\\Downloads\\movie.whiskers']
-    # info('extracting whisker movement for file {0}', '')
-    # whisk_data = subprocess.check_output(call)
-    # whisk_data = json.loads(whisk_data.decode('utf-8'))
+    sparams = __parse_yaml()['system']
+    call = [sparams['python27_path'], sparams['trace_path'], '--input',
+            'C:\\Users\\VoyseyG\\Desktop\\application\\li1.whiskers']
+    info('extracting whisker movement for file {0}', '')
+    whisk_data_left = subprocess.check_output(call)
+    whisk_data_left = json.loads(whisk_data_left.decode('utf-8'))
+    camera_parameters['name'] = 'left'
+    left = serialized(whisk_data_left, camera_parameters)
+
+    call = [sparams['python27_path'], sparams['trace_path'], '--input',
+            'C:\\Users\\VoyseyG\\Desktop\\application\\ri2.whiskers']
+    info('extracting whisker movement for file {0}', '')
+    whisk_data_right = subprocess.check_output(call)
+    whisk_data_right = json.loads(whisk_data_right.decode('utf-8'))
+    camera_parameters['name'] = 'right'
+    right = serialized(whisk_data_right, camera_parameters)
+
+    plot_left_right(left, right, 'joined.pdf')
+    plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
 
 
 def __parse_yaml(location: str = None) -> dict:
