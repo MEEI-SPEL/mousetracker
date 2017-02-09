@@ -8,7 +8,7 @@ camera:
 # the subject specifications
 animal:
   species: 'rat'
-  color:  'white'
+  whisker_color:  'white'
 # runtime constants
 system:
   python27_path: 'C:\\Python27\\python.exe'

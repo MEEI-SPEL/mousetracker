@@ -6,50 +6,67 @@ Usage:
     whisker_preprocess -h | --help
     whisker_preprocess --version
     whisker_preprocess (-i <input_file> | --input <input_file>) [(-o <output_file> | --output <output_file>)]
-                       [(-v | --verbose)]
+                       [(-v | --verbose)] [ --config <config_file> | --print-config]
 
 Options:
     -h --help                   Show this screen and exit.
     --version                   Display the version and exit.
+    --print-config              Print the default config value and exit.
     -i --input=<input_file>     Specify the file to process.
     -o --output=<output_file>   Specify a location to store the analyzed results.
+    --config=<config_file>       Specify a path to a custom config file.  See --print-config for format.
     -v --verbose                Display extra diagnostic information during execution.
 
 """
-import sys
-from os import path, environ, access, W_OK
+import json
 import platform
-from docopt import docopt
+import subprocess
+import sys
+from logging import info, error, getLogger, ERROR
+from os import access, W_OK, utime
+
 import yaml
+from docopt import docopt
+
+# noinspection PyProtectedMember
 from core._version import __version__
 from core.base import *
-from core.whisker_motion import WhiskerMotion
 from core.eye_blink import EyeBlink
-from logging import info, error, getLogger, ERROR
-import subprocess
-import json
-from collections import OrderedDict
-import numpy as np
 from core.whisk_analysis import serialized, plot_left_right
+from core.whisker_motion import WhiskerMotion
 
 
 def main(inputargs):
     __check_requirements()
     args = docopt(__doc__, version=__version__, argv=inputargs)
     __validate_args(args)
+    defaults_yaml = __parse_yaml(args)
+    if args['--print-config']:
+        print(defaults_yaml)
+        return 0
 
     # get the default parameters for the hardware system
-    camera_parameters = __parse_yaml()['camera']
+    camera_parameters = defaults_yaml['camera']
     info('read default hardware parameters.')
-
-    # extract measures
     info('processing file {0}'.format(path.split(args['--input'])[1]))
-    WhiskerMotion(infile=args['--input'], outfile=args['--output'], camera_params=camera_parameters).extract_all()
-    EyeBlink(infile=args['--input'], outfile=args['--output'], camera_params=camera_parameters).extract_all()
+
+    # reduce to 8-bit greyscale
+
+    # invert colors
+
+    # split left and right
+
+    # handle framelength or re-align frame times (tbd)
+
+    # extract whisking data for left and right
+    (leftw, rightw) = WhiskerMotion(infile=args['--input'], outfile=args['--output'],
+                                    camera_params=camera_parameters).extract_all()
+    (lefte, righte) = EyeBlink(infile=args['--input'], outfile=args['--output'],
+                               camera_params=camera_parameters).extract_all()
 
     # test_serialized('test.json', camera_parameters)
     # Return whisker data from file.
-    sparams = __parse_yaml()['system']
+    sparams = defaults_yaml['system']
     call = [sparams['python27_path'], sparams['trace_path'], '--input',
             'C:\\Users\\VoyseyG\\Desktop\\application\\li1.whiskers']
     info('extracting whisker movement for file {0}', '')
@@ -70,13 +87,13 @@ def main(inputargs):
     plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
 
 
-def __parse_yaml(location: str = None) -> dict:
+def __parse_yaml(args:dict) -> dict:
     """
     Read hardware configuration values from a YAML file.
     :param location: a custom YAML file (optional).  If not specified, values from the default are used.
     :return: a deserialized dictionary.
     """
-    loc = path.join(modulePath, 'resources', 'defaults.yaml') if location is None else location
+    loc = path.join(modulePath, 'resources', 'defaults.yaml') if args['--config'] is None else args['--config']
     with open(loc, 'r') as _:
         contents = yaml.load(_)
     return contents
@@ -116,9 +133,17 @@ def __validate_args(args: dict):
             args['--output'] = path.split(args['--input'])[0]
     if not access(args['--output'], W_OK):
         raise PermissionError('{0} is not writable!'.format(args['--output']))
-
     if not args["--verbose"]:
         getLogger().setLevel(ERROR)
+    if args['--config'] and not path.isfile(args['--config']):
+        raise FileNotFoundError('{0} not found!'.format(args['--config']))
+
+
+def __touch(fname, times=None):
+    """ As coreutils touch.
+    """
+    with open(fname, 'a+'):
+        utime(fname, times)
 
 
 if __name__ == "__main__":
