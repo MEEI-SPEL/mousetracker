@@ -5,8 +5,8 @@ Whisker Preprocessor.   Extracts bilateral whisking and eyeblink data from a vid
 Usage:
     whisker_preprocess -h | --help
     whisker_preprocess --version
-    whisker_preprocess (-i <input_file> | --input <input_file>) [(-o <output_file> | --output <output_file>)]
-                       [(-v | --verbose)] [ --config <config_file> | --print-config]
+    whisker_preprocess ([-i <input_file> | --input <input_file>] | [ --config <config_file> | --print-config] ) [(-o <output_file> | --output <output_file>)]
+                       [(-v | --verbose)]
 
 Options:
     -h --help                   Show this screen and exit.
@@ -18,6 +18,7 @@ Options:
     -v --verbose                Display extra diagnostic information during execution.
 
 """
+#-i "C:\\Users\\VoyseyG\\Dropbox\\Whisker Tracking\\test videos\\whisking with movement (1).MP4"
 import json
 import platform
 import subprocess
@@ -27,6 +28,7 @@ from os import access, W_OK, utime
 
 import yaml
 from docopt import docopt
+import pprint
 
 # noinspection PyProtectedMember
 from core._version import __version__
@@ -34,16 +36,20 @@ from core.base import *
 from core.eye_blink import EyeBlink
 from core.whisk_analysis import serialized, plot_left_right
 from core.whisker_motion import WhiskerMotion
+from core.yaml_config import Config
 
 
 def main(inputargs):
     __check_requirements()
     args = docopt(__doc__, version=__version__, argv=inputargs)
-    __validate_args(args)
     defaults_yaml = __parse_yaml(args)
     if args['--print-config']:
-        print(defaults_yaml)
+        print("Detected Configuration Parameters: ")
+        pprint.pprint(defaults_yaml, depth=5)
         return 0
+    __validate_args(args)
+
+
 
     # get the default parameters for the hardware system
     camera_parameters = defaults_yaml['camera']
@@ -87,7 +93,7 @@ def main(inputargs):
     plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
 
 
-def __parse_yaml(args:dict) -> dict:
+def __parse_yaml(args:dict) -> Config:
     """
     Read hardware configuration values from a YAML file.
     :param location: a custom YAML file (optional).  If not specified, values from the default are used.
@@ -96,7 +102,7 @@ def __parse_yaml(args:dict) -> dict:
     loc = path.join(modulePath, 'resources', 'defaults.yaml') if args['--config'] is None else args['--config']
     with open(loc, 'r') as _:
         contents = yaml.load(_)
-    return contents
+    return Config(**contents)
 
 
 def __check_requirements():

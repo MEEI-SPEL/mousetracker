@@ -1,5 +1,6 @@
 # operational defaults to describe hardware components in the system.
 
+
 # the optical specifications
 camera:
   width: 1080
@@ -13,3 +14,8 @@ animal:
 system:
   python27_path: 'C:\\Python27\\python.exe'
   trace_path: 'C:\\Users\\VoyseyG\\Projects\\whisk\\python\\trace.py'
+
+#analysis parameters
+bandpass:
+  low: 2 #in Hz
+  high: 50 #in Hz
