@@ -43,32 +43,32 @@ def low_smaller_than_high(instance, attribute, value):
         raise ValueError("'low' has to be smaller than 'high'!")
 
 
-@attr.s
+@attr.s(frozen=True)
 class Camera(object):
     width = attr.ib(validator=instance_of(int))
     height = attr.ib(validator=instance_of(int))
     framerate = attr.ib(validator=instance_of(int))
 
 
-@attr.s
+@attr.s(frozen=True)
 class Animal(object):
     species = attr.ib(convert=ensure_enum(Species))
     whisker_color = attr.ib(convert=ensure_enum(WhiskColor))
 
 
-@attr.s
+@attr.s(frozen=True)
 class System(object):
     python27_path = attr.ib(validator=is_path_of_file)
     trace_path = attr.ib(validator=is_path_of_file)
 
 
-@attr.s
+@attr.s(frozen=True)
 class Bandpass(object):
     low = attr.ib(validator=low_smaller_than_high)
     high = attr.ib(validator=instance_of(int))
 
 
-@attr.s
+@attr.s(frozen=True)
 class Config:
     camera = attr.ib(convert=ensure_cls(Camera))
     animal = attr.ib(convert=ensure_cls(Animal))
