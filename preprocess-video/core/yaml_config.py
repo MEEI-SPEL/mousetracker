@@ -63,6 +63,7 @@ class System(object):
     trace_path = attr.ib(validator=is_path_of_file)
     avidemux_path = attr.ib(validator=is_path_of_file)
     ffmpeg_path = attr.ib(validator=is_path_of_file)
+    whisk_base_path =attr.ib(validator=is_path_of_file)
 
 
 @attr.s(frozen=True)
