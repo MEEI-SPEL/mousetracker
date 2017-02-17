@@ -37,6 +37,54 @@ import core.yaml_config as yaml_config
 import numpy as np
 
 
+def prepare_video(args, app_config):
+    # preprocess video
+    outname = path.join(args.output, 'foo.mp4')
+
+    cap = cv2.VideoCapture(args.input)
+    #codec = cv2.VideoWriter_fourcc(*'H264')
+    #codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+    codec = cv2.VideoWriter_fourcc(*'MPEG')
+    framerate = app_config.camera.framerate
+    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                 int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))  # (app_config.camera.width, app_config.camera.height)
+
+
+    vw_left = cv2.VideoWriter(filename=outname, fourcc=codec, fps=framerate, frameSize=size, isColor=False)
+    vw_right = cv2.VideoWriter(filename=outname, fourcc=codec, fps=framerate, frameSize=size, isColor=False)
+    curframe = 0
+    with progressbar.ProgressBar(min_value=0, max_value=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))) as pb:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if ret:
+                curframe += 1
+                pb.update(curframe)
+                # convert to greyscale
+                grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                # invert colors
+                inverted = cv2.bitwise_not(grey)
+                #vw_left.write(inverted)
+                # crop left half
+                half_width = round(size[0]/2)
+                left = inverted[1:app_config.camera.height, 1:half_width]
+                cv2.imshow('left', left)
+                right = inverted[1:app_config.camera.height, half_width: app_config.camera.width]
+                # vw.write(inverted)
+
+
+                cv2.imshow('right', right)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                   break
+            else:
+                break
+
+        cap.release()
+        vw_left.release()
+        cv2.destroyAllWindows()
+    if path.isfile(outname):
+        info("wrote {0}".format(outname))
+
+
 def main(inputargs):
     args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
     __check_requirements()
@@ -50,47 +98,8 @@ def main(inputargs):
     # get the default parameters for the hardware system
     info('read default hardware parameters.')
     info('processing file {0}'.format(path.split(args.input)[1]))
+    prepare_video(args, app_config)
 
-    # preprocess video
-
-    outname = 'foo.mp4'
-    cap = cv2.VideoCapture(args.input)
-
-    # codec = cv2.VideoWriter_fourcc(*'H264')
-    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
-    framerate = app_config.camera.framerate
-    size = (app_config.camera.width, app_config.camera.height)
-
-    vw = cv2.VideoWriter(filename=outname, fourcc=codec, fps=framerate, frameSize=size, isColor=False)
-    curframe = 0
-    with progressbar.ProgressBar(min_value=0, max_value=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))) as pb:
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if ret:
-                curframe += 1
-                pb.update(curframe)
-                # convert to greyscale
-                grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                # invert colors
-                inverted = cv2.bitwise_not(grey)
-                vw.write(inverted)
-                # crop left half
-                half_width = round(app_config.camera.width)
-                #left = inverted[1:app_config.camera.height, 1:half_width]
-                #cv2.imshow('left', left)
-                #right = inverted[1:app_config.camera.height, half_width: app_config.camera.width]
-                #vw.write(inverted)
-
-
-                #cv2.imshow('right', right)
-                #if cv2.waitKey(1) & 0xFF == ord('q'):
-                #    break
-            else:
-                break
-
-        cap.release()
-        vw.release()
-        cv2.destroyAllWindows()
 
 
 
