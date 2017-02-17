@@ -22,26 +22,42 @@ Options:
 import platform
 import pprint
 import sys
+from enum import Enum
 from logging import info, error, getLogger, ERROR
 from os import access, W_OK, utime
 
-import progressbar
-import cv2
-from attrs_utils.interop import from_docopt
 import attr
+import cv2
+import progressbar
 from attr.validators import instance_of
+from attrs_utils.interop import from_docopt
+from attrs_utils.validators import ensure_cls, ensure_enum
+
+import core.yaml_config as yaml_config
 from core._version import __version__
 from core.base import *
-from core.eye_blink import EyeBlink
-from core.whisker_motion import WhiskerMotion
-import core.yaml_config as yaml_config
-import numpy as np
+
+
+class SideOfFace(Enum):
+    left = 1
+    right = 2
+
+
+@attr.s
+class VideoFileData(object):
+    name = attr.ib(validator=instance_of(str))
+    side = attr.ib(convert=ensure_enum(SideOfFace))
+
+    def __attrs_post_init__(self):
+        name, ext = path.splitext(self.name)
+        self.whiskname = name + ".whiskers"
+        self.measname = name + ".measurements"
 
 
 @attr.s
 class VideoLocations(object):
-    left = attr.ib(validator=instance_of(str))
-    right = attr.ib(validator=instance_of(str))
+    left = attr.ib(convert=ensure_cls(VideoFileData))
+    right = attr.ib(convert=ensure_cls(VideoFileData))
 
 
 def main(inputargs):
@@ -58,7 +74,8 @@ def main(inputargs):
     info('read default hardware parameters.')
     info('processing file {0}'.format(path.split(args.input)[1]))
     files = prepare_video(args, app_config)
-
+    extract_whisk_data(files.left)
+    extract_whisk_data(files.right)
 
 
 
@@ -91,23 +108,29 @@ def main(inputargs):
     # plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
 
 
+def extract_whisk_data(video: VideoFileData):
+    pass
+
+
 def prepare_video(args, app_config) -> VideoLocations:
     # preprocess video
     name, ext = path.splitext(path.basename(args.input))
-    leftname = path.join(args.output, name + "-left" + ext)
-    rightname = path.join(args.output, name + "-right" + ext)
+
+    left = VideoFileData(name=path.join(args.output, name + "-left" + ext), side=SideOfFace.left)
+    right = VideoFileData(name=path.join(args.output, name + "-right" + ext), side=SideOfFace.right)
+
     cap = cv2.VideoCapture(args.input)
     # codec = cv2.VideoWriter_fourcc(*'H264')
     # codec = int(cap.get(cv2.CAP_PROP_FOURCC))
     codec = cv2.VideoWriter_fourcc(*'MPEG')
     framerate = app_config.camera.framerate
     size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))  # (app_config.camera.width, app_config.camera.height)
+            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 
     cropped_size = (round(size[0] / 2), size[1])
 
-    vw_left = cv2.VideoWriter(filename=leftname, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
-    vw_right = cv2.VideoWriter(filename=rightname, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
+    vw_left = cv2.VideoWriter(filename=left.name, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
+    vw_right = cv2.VideoWriter(filename=right.name, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
     curframe = 0
     with progressbar.ProgressBar(min_value=0, max_value=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))) as pb:
         while cap.isOpened():
@@ -121,11 +144,11 @@ def prepare_video(args, app_config) -> VideoLocations:
                 inverted = cv2.bitwise_not(grey)
                 # crop left half
                 half_width = round(size[0] / 2)
-                left = inverted[0:size[1], 0:half_width]
-                right = inverted[0:size[1], half_width:size[0]]
+                left_frame = inverted[0:size[1], 0:half_width]
+                right_frame = inverted[0:size[1], half_width:size[0]]
 
-                vw_left.write(left)
-                vw_right.write(right)
+                vw_left.write(left_frame)
+                vw_right.write(right_frame)
 
 
 
@@ -140,10 +163,10 @@ def prepare_video(args, app_config) -> VideoLocations:
         vw_left.release()
         vw_right.release()
         cv2.destroyAllWindows()
-    if path.isfile(leftname) and path.isfile(rightname):
-        info("wrote {0}".format(leftname))
-        info("wrote {0}".format(rightname))
-        return VideoLocations(left=leftname, right=rightname)
+    if path.isfile(left.name) and path.isfile(right.name):
+        info("wrote {0}".format(left.name))
+        info("wrote {0}".format(right.name))
+        return VideoLocations(left=left, right=right)
     else:
         raise IOError("Video preprocessing failed on file {}".format(args.input))
 
