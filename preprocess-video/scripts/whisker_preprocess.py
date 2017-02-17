@@ -113,15 +113,17 @@ def extract_whisk_data(video: VideoFileData):
 
 
 def prepare_video(args, app_config) -> VideoLocations:
-    # preprocess video
-    name, ext = path.splitext(path.basename(args.input))
+    """
 
+    :param args:
+    :param app_config:
+    :return:
+    """
+    name, ext = path.splitext(path.basename(args.input))
     left = VideoFileData(name=path.join(args.output, name + "-left" + ext), side=SideOfFace.left)
     right = VideoFileData(name=path.join(args.output, name + "-right" + ext), side=SideOfFace.right)
 
     cap = cv2.VideoCapture(args.input)
-    # codec = cv2.VideoWriter_fourcc(*'H264')
-    # codec = int(cap.get(cv2.CAP_PROP_FOURCC))
     codec = cv2.VideoWriter_fourcc(*'MPEG')
     framerate = app_config.camera.framerate
     size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
@@ -142,27 +144,25 @@ def prepare_video(args, app_config) -> VideoLocations:
                 grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 # invert colors
                 inverted = cv2.bitwise_not(grey)
-                # crop left half
-                half_width = round(size[0] / 2)
-                left_frame = inverted[0:size[1], 0:half_width]
-                right_frame = inverted[0:size[1], half_width:size[0]]
-
+                # split in half
+                left_frame = inverted[0:cropped_size[1], 0:cropped_size[0]]
+                right_frame = inverted[0:cropped_size[1], cropped_size[0]:size[0]]
+                # write out
                 vw_left.write(left_frame)
                 vw_right.write(right_frame)
-
-
-
+                # uncomment to see live preview.
                 # cv2.imshow('left', left)
                 # cv2.imshow('right', right)
                 # if cv2.waitKey(1) & 0xFF == ord('q'):
                 #    break
             else:
                 break
-
+        # clean up, because openCV is stupid and doesn't implement `with ...`
         cap.release()
         vw_left.release()
         vw_right.release()
         cv2.destroyAllWindows()
+    # either return or die.
     if path.isfile(left.name) and path.isfile(right.name):
         info("wrote {0}".format(left.name))
         info("wrote {0}".format(right.name))
