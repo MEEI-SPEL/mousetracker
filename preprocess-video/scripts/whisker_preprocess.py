@@ -32,6 +32,7 @@ import progressbar
 from attr.validators import instance_of
 from attrs_utils.interop import from_docopt
 from attrs_utils.validators import ensure_cls, ensure_enum
+import subprocess
 
 import core.yaml_config as yaml_config
 from core._version import __version__
@@ -74,8 +75,8 @@ def main(inputargs):
     info('read default hardware parameters.')
     info('processing file {0}'.format(path.split(args.input)[1]))
     files = prepare_video(args, app_config)
-    extract_whisk_data(files.left)
-    extract_whisk_data(files.right)
+    extract_whisk_data(files.left, app_config)
+    extract_whisk_data(files.right, app_config)
 
 
 
@@ -108,8 +109,34 @@ def main(inputargs):
     # plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
 
 
-def extract_whisk_data(video: VideoFileData):
-    pass
+def extract_whisk_data(video: VideoFileData, config):
+    base = config.system.whisk_base_path
+    trace_path = path.join(base, 'trace.exe')
+    trace_args = [video.name, video.whiskname]
+    measure_path = path.join(base, 'measure.exe')
+    measure_args = ['--face', video.side.name, video.whiskname, video.measname]
+    classify_path = path.join(base, 'classify.exe')
+    classify_args = [video.measname, video.measname, video.side.name, '--px2mm', '0.04', 'n', '-1']
+    reclassify_path = path.join(base, 'reclassify.exe')
+    reclassify_args = [video.measname, video.measname, '-n', '-1']
+
+    istraced = subprocess.run([trace_path, *trace_args])
+    if istraced.returncode == 0:
+        ismeasured = subprocess.run([measure_path, *measure_args])
+        if ismeasured.returncode == 0:
+            isclassified = subprocess.run([classify_path, *classify_args])
+            if isclassified.returncode == 0:
+                isreclassified = subprocess.run([reclassify_path, *reclassify_args])
+                if isreclassified.returncode == 0:
+                    return
+                else:
+                    raise IOError("reclassifer failed on {}".format(video.name))
+            else:
+                raise IOError("classifer failed on {}".format(video.name))
+        else:
+            raise IOError("measurement failed on {}".format(video.name))
+    else:
+        raise IOError("trace failed on {}".format(video.name))
 
 
 def prepare_video(args, app_config) -> VideoLocations:
