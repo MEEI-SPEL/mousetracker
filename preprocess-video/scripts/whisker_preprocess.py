@@ -25,7 +25,8 @@ import sys
 from enum import Enum
 from logging import info, error, getLogger, ERROR
 from os import access, W_OK, utime
-
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
 import attr
 import cv2
 import progressbar
@@ -33,10 +34,13 @@ from attr.validators import instance_of
 from attrs_utils.interop import from_docopt
 from attrs_utils.validators import ensure_cls, ensure_enum
 import subprocess
+from math import ceil
 
 import core.yaml_config as yaml_config
 from core._version import __version__
 from core.base import *
+
+MAX_FRAMES = 1000
 
 
 class SideOfFace(Enum):
@@ -57,8 +61,7 @@ class VideoFileData(object):
 
 @attr.s
 class VideoLocations(object):
-    left = attr.ib(convert=ensure_cls(VideoFileData))
-    right = attr.ib(convert=ensure_cls(VideoFileData))
+    videos = attr.ib()
 
 
 def main(inputargs):
@@ -74,12 +77,9 @@ def main(inputargs):
     # get the default parameters for the hardware system
     info('read default hardware parameters.')
     info('processing file {0}'.format(path.split(args.input)[1]))
-    files = prepare_video(args, app_config)
-    extract_whisk_data(files.left, app_config)
-    extract_whisk_data(files.right, app_config)
+    files = segment_video(args, app_config)
 
-
-
+    result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
     # extract whisking data for left and right
     # (leftw, rightw) = WhiskerMotion(infile=args.input, outfile=args.output,
     #                                 camera_params=app_config.camera).extract_all()
@@ -128,7 +128,7 @@ def extract_whisk_data(video: VideoFileData, config):
             if isclassified.returncode == 0:
                 isreclassified = subprocess.run([reclassify_path, *reclassify_args])
                 if isreclassified.returncode == 0:
-                    return
+                    return True
                 else:
                     raise IOError("reclassifer failed on {}".format(video.name))
             else:
@@ -139,63 +139,99 @@ def extract_whisk_data(video: VideoFileData, config):
         raise IOError("trace failed on {}".format(video.name))
 
 
-def prepare_video(args, app_config) -> VideoLocations:
+@attr.s
+class Chunk(object):
+    left = attr.ib(validator=instance_of(str))
+    right = attr.ib(validator=instance_of(str))
+    start = attr.ib(validator=instance_of(int))
+    stop = attr.ib(validator=instance_of(int))
+
+
+def segment_video(args, app_config):
+    name, ext = path.splitext(path.basename(args.input))
+
+    cap = cv2.VideoCapture(args.input)
+    framecount = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    chunks = ceil(framecount / MAX_FRAMES)
+
+    videos = []
+    for c in range(chunks):
+        start_frame = MAX_FRAMES * c
+        stop_frame = start_frame + MAX_FRAMES - 1
+        if stop_frame > framecount:
+            stop_frame = framecount
+
+        thisLeft = path.join(args.output, name + "-left" + str(c) + ext)
+        thisRight = path.join(args.output, name + "-right" + str(c) + ext)
+        chunk = Chunk(left=thisLeft, right=thisRight, start=start_frame, stop=stop_frame)
+        videos.extend(prepare_video(args, app_config, chunk))
+    return VideoLocations(videos=videos)
+
+
+def prepare_video(args, app_config, chunk: Chunk):
     """
 
+    :param chunk:
+    :param rightpath:
+    :param leftpath:
     :param args:
     :param app_config:
     :return:
     """
-    name, ext = path.splitext(path.basename(args.input))
-    left = VideoFileData(name=path.join(args.output, name + "-left" + ext), side=SideOfFace.left)
-    right = VideoFileData(name=path.join(args.output, name + "-right" + ext), side=SideOfFace.right)
-
-    cap = cv2.VideoCapture(args.input)
-    codec = cv2.VideoWriter_fourcc(*'MPEG')
-    framerate = app_config.camera.framerate
-    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-
-    cropped_size = (round(size[0] / 2), size[1])
-
-    vw_left = cv2.VideoWriter(filename=left.name, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
-    vw_right = cv2.VideoWriter(filename=right.name, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
-    curframe = 0
-    with progressbar.ProgressBar(min_value=0, max_value=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))) as pb:
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if ret:
-                curframe += 1
-                pb.update(curframe)
-                # convert to greyscale
-                grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                # invert colors
-                inverted = cv2.bitwise_not(grey)
-                # split in half
-                left_frame = inverted[0:cropped_size[1], 0:cropped_size[0]]
-                right_frame = inverted[0:cropped_size[1], cropped_size[0]:size[0]]
-                # write out
-                vw_left.write(left_frame)
-                vw_right.write(right_frame)
-                # uncomment to see live preview.
-                # cv2.imshow('left', left)
-                # cv2.imshow('right', right)
-                # if cv2.waitKey(1) & 0xFF == ord('q'):
-                #    break
-            else:
-                break
-        # clean up, because openCV is stupid and doesn't implement `with ...`
-        cap.release()
-        vw_left.release()
-        vw_right.release()
-        cv2.destroyAllWindows()
-    # either return or die.
+    left = VideoFileData(name=chunk.left, side=SideOfFace.left)
+    right = VideoFileData(name=chunk.right, side=SideOfFace.right)
     if path.isfile(left.name) and path.isfile(right.name):
-        info("wrote {0}".format(left.name))
-        info("wrote {0}".format(right.name))
-        return VideoLocations(left=left, right=right)
+        return left, right
     else:
-        raise IOError("Video preprocessing failed on file {}".format(args.input))
+        cap = cv2.VideoCapture(args.input)
+        # jump to the right frame
+        cap.set(1, chunk.start)
+        codec = cv2.VideoWriter_fourcc(*'MPEG')
+        framerate = app_config.camera.framerate
+        size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+
+        cropped_size = (round(size[0] / 2), size[1])
+        framecount = chunk.stop - chunk.start
+
+        vw_left = cv2.VideoWriter(filename=left.name, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
+        vw_right = cv2.VideoWriter(filename=right.name, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
+        curframe = 0
+        with progressbar.ProgressBar(min_value=0, max_value=framecount) as pb:
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if ret and (curframe < framecount):
+                    curframe += 1
+                    pb.update(curframe)
+                    # convert to greyscale
+                    grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    # invert colors
+                    inverted = cv2.bitwise_not(grey)
+                    # split in half
+                    left_frame = inverted[0:cropped_size[1], 0:cropped_size[0]]
+                    right_frame = inverted[0:cropped_size[1], cropped_size[0]:size[0]]
+                    # write out
+                    vw_left.write(left_frame)
+                    vw_right.write(right_frame)
+                    # uncomment to see live preview.
+                    # cv2.imshow('left', left)
+                    # cv2.imshow('right', right)
+                    # if cv2.waitKey(1) & 0xFF == ord('q'):
+                    #    break
+                else:
+                    break
+            # clean up, because openCV is stupid and doesn't implement `with ...`
+            cap.release()
+            vw_left.release()
+            vw_right.release()
+            cv2.destroyAllWindows()
+        # either return or die.
+        if path.isfile(left.name) and path.isfile(right.name):
+            info("wrote {0}".format(left.name))
+            info("wrote {0}".format(right.name))
+            return left, right
+        else:
+            raise IOError("Video preprocessing failed on file {}".format(args.input))
 
 
 def __check_requirements():
