@@ -40,7 +40,7 @@ import core.yaml_config as yaml_config
 from core._version import __version__
 from core.base import *
 
-MAX_FRAMES = 1000
+MAX_FRAMES = 120000
 
 
 class SideOfFace(Enum):
@@ -64,6 +64,14 @@ class VideoLocations(object):
     videos = attr.ib()
 
 
+@attr.s
+class Chunk(object):
+    left = attr.ib(validator=instance_of(str))
+    right = attr.ib(validator=instance_of(str))
+    start = attr.ib(validator=instance_of(int))
+    stop = attr.ib(validator=instance_of(int))
+
+
 def main(inputargs):
     args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
     __check_requirements()
@@ -80,6 +88,7 @@ def main(inputargs):
     files = segment_video(args, app_config)
 
     result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
+    print(result)
     # extract whisking data for left and right
     # (leftw, rightw) = WhiskerMotion(infile=args.input, outfile=args.output,
     #                                 camera_params=app_config.camera).extract_all()
@@ -139,14 +148,6 @@ def extract_whisk_data(video: VideoFileData, config):
         raise IOError("trace failed on {}".format(video.name))
 
 
-@attr.s
-class Chunk(object):
-    left = attr.ib(validator=instance_of(str))
-    right = attr.ib(validator=instance_of(str))
-    start = attr.ib(validator=instance_of(int))
-    stop = attr.ib(validator=instance_of(int))
-
-
 def segment_video(args, app_config):
     name, ext = path.splitext(path.basename(args.input))
 
@@ -166,6 +167,18 @@ def segment_video(args, app_config):
         chunk = Chunk(left=thisLeft, right=thisRight, start=start_frame, stop=stop_frame)
         videos.extend(prepare_video(args, app_config, chunk))
     return VideoLocations(videos=videos)
+
+
+def align_timestamps(video, args, app_config):
+    name, ext = path.splitext(video)
+    aligned = name + "-aligned" + ext
+    command = [app_config.system.ffmpeg_path, '-i', args.input, '-codec:v', 'mpeg4', '-r', '240',
+               '-qscale:v', '2', '-codec:a', 'copy', aligned]
+    result = subprocess.run(command)
+    if result:
+        return aligned
+    else:
+        return None
 
 
 def prepare_video(args, app_config, chunk: Chunk):
@@ -194,8 +207,10 @@ def prepare_video(args, app_config, chunk: Chunk):
         cropped_size = (round(size[0] / 2), size[1])
         framecount = chunk.stop - chunk.start
 
-        vw_left = cv2.VideoWriter(filename=left.name, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
-        vw_right = cv2.VideoWriter(filename=right.name, fourcc=codec, fps=framerate, frameSize=cropped_size, isColor=False)
+        vw_left = cv2.VideoWriter(filename=left.name, fourcc=codec, fps=framerate, frameSize=cropped_size,
+                                  isColor=False)
+        vw_right = cv2.VideoWriter(filename=right.name, fourcc=codec, fps=framerate, frameSize=cropped_size,
+                                   isColor=False)
         curframe = 0
         with progressbar.ProgressBar(min_value=0, max_value=framecount) as pb:
             while cap.isOpened():
@@ -227,9 +242,14 @@ def prepare_video(args, app_config, chunk: Chunk):
             cv2.destroyAllWindows()
         # either return or die.
         if path.isfile(left.name) and path.isfile(right.name):
-            info("wrote {0}".format(left.name))
-            info("wrote {0}".format(right.name))
-            return left, right
+            aligned_l = align_timestamps(left.name, args, app_config)
+            aligned_r = align_timestamps(right.name, args, app_config)
+            if path.isfile(aligned_l) and path.isfile(aligned_r):
+                info("wrote {0}".format(left.name))
+                info("wrote {0}".format(right.name))
+                return left, right
+            else:
+                raise IOError("Video preprocessing failed on file {}".format(args.input))
         else:
             raise IOError("Video preprocessing failed on file {}".format(args.input))
 
