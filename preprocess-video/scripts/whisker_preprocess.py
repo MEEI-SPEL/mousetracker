@@ -87,8 +87,11 @@ def main(inputargs):
     info('processing file {0}'.format(path.split(args.input)[1]))
     files = segment_video(args, app_config)
 
-    result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
-    print(result)
+    #result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
+    #print(result)
+    for f in files.videos:
+        result = extract_whisk_data(f, app_config)
+        print(result)
     # extract whisking data for left and right
     # (leftw, rightw) = WhiskerMotion(infile=args.input, outfile=args.output,
     #                                 camera_params=app_config.camera).extract_all()
@@ -125,7 +128,7 @@ def extract_whisk_data(video: VideoFileData, config):
     measure_path = path.join(base, 'measure.exe')
     measure_args = ['--face', video.side.name, video.whiskname, video.measname]
     classify_path = path.join(base, 'classify.exe')
-    classify_args = [video.measname, video.measname, video.side.name, '--px2mm', '0.04', 'n', '-1']
+    classify_args = [video.measname, video.measname, video.side.name, '--px2mm', '0.04', '-n', '-1']
     reclassify_path = path.join(base, 'reclassify.exe')
     reclassify_args = [video.measname, video.measname, '-n', '-1']
 
@@ -245,6 +248,8 @@ def prepare_video(args, app_config, chunk: Chunk):
             aligned_l = align_timestamps(left.name, args, app_config)
             aligned_r = align_timestamps(right.name, args, app_config)
             if path.isfile(aligned_l) and path.isfile(aligned_r):
+                left.name = aligned_l
+                right.name = aligned_r
                 info("wrote {0}".format(left.name))
                 info("wrote {0}".format(right.name))
                 return left, right
