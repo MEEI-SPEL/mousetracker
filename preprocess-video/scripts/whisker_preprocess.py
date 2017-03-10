@@ -53,6 +53,7 @@ class SideOfFace(Enum):
 class VideoFileData(object):
     name = attr.ib(validator=instance_of(str))
     side = attr.ib(convert=ensure_enum(SideOfFace))
+    eye = attr.ib()
 
     def __attrs_post_init__(self):
         name, ext = path.splitext(self.name)
@@ -163,19 +164,11 @@ def segment_video(args, app_config):
 
     cap = cv2.VideoCapture(args.input)
     framecount = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    chunks = ceil(framecount / MAX_FRAMES)
-
     videos = []
-    for c in range(chunks):
-        start_frame = MAX_FRAMES * c
-        stop_frame = start_frame + MAX_FRAMES - 1
-        if stop_frame > framecount:
-            stop_frame = framecount
-
-        thisLeft = path.join(args.output, name + "-left" + str(c) + ext)
-        thisRight = path.join(args.output, name + "-right" + str(c) + ext)
-        chunk = Chunk(left=thisLeft, right=thisRight, start=start_frame, stop=stop_frame)
-        videos.extend(prepare_video(args, app_config, chunk))
+    thisLeft = path.join(args.output, name + "-left" + ext)
+    thisRight = path.join(args.output, name + "-right" + ext)
+    chunk = Chunk(left=thisLeft, right=thisRight, start=0, stop=framecount)
+    videos.extend(prepare_video(args, app_config, chunk))
     return VideoLocations(videos=videos)
 
 
@@ -208,8 +201,8 @@ def prepare_video(args, app_config, chunk: Chunk):
     :param app_config:
     :return:
     """
-    left = VideoFileData(name=chunk.left, side=SideOfFace.left)
-    right = VideoFileData(name=chunk.right, side=SideOfFace.right)
+    left = VideoFileData(name=chunk.left, side=SideOfFace.left, eye=[])
+    right = VideoFileData(name=chunk.right, side=SideOfFace.right, eye=[])
 
     cap = cv2.VideoCapture(args.input)
     # jump to the right frame
@@ -237,8 +230,8 @@ def prepare_video(args, app_config, chunk: Chunk):
                 left_frame = frame[0:cropped_size[1], 0:cropped_size[0]]
                 right_frame = frame[0:cropped_size[1], cropped_size[0]:size[0]]
                 # measure eye areas
-                left_size, left_area = eyes.process_frame(left_frame)
-                right_size, right_area = eyes.process_frame(right_frame)
+                left.eye.append(eyes.process_frame(left_frame))
+                right.eye.append(eyes.process_frame(right_frame))
                 # greyscale and invert for whisk detection
                 left_frame = cv2.bitwise_not(cv2.cvtColor(left_frame, cv2.COLOR_BGR2GRAY))
                 right_frame = cv2.bitwise_not(cv2.cvtColor(right_frame, cv2.COLOR_BGR2GRAY))

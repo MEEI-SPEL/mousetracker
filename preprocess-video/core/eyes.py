@@ -3,7 +3,7 @@ import numpy as np
 
 
 def __show_debug_image(name, frame):
-    pass
+    return
     cv2.imshow(name, frame)
     cv2.waitKey()
 
