@@ -3,6 +3,7 @@ import numpy as np
 
 
 def __show_debug_image(name, frame):
+    pass
     cv2.imshow(name, frame)
     cv2.waitKey()
 
@@ -37,12 +38,10 @@ def process_frame(frame):
     opening = cv2.morphologyEx(erosion, cv2.MORPH_OPEN, kernel)
     closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE,
                                kernel)  # this is for further removing small noises and holes in the image
-    cv2.imshow('processed', closing)
-    cv2.waitKey()
-
+    __show_debug_image('processed', closing)
     return closing.size, np.count_nonzero(closing)
 
 
 if __name__ == "__main__":
-    frame = cv2.imread('first.png')
-    process_frame(frame)
+    thisframe = cv2.imread('first.png')
+    process_frame(thisframe)

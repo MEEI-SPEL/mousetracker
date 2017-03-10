@@ -18,7 +18,6 @@ Options:
     -v --verbose                Display extra diagnostic information during execution.
 
 """
-# -i "C:\\Users\\VoyseyG\\Dropbox\\Whisker Tracking\\test videos\\whisking with movement (1).MP4"
 import platform
 import pprint
 import subprocess
@@ -91,17 +90,9 @@ def main(inputargs):
 
     result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
     print(result)
-
-
-
     # for f in files.videos:
     #     result = extract_whisk_data(f, app_config)
     #     print(result)
-    # # extract whisking data for left and right
-    # (leftw, rightw) = WhiskerMotion(infile=args.input, outfile=args.output,
-    #                                 camera_params=app_config.camera).extract_all()
-    # (lefte, righte) = EyeBlink(infile=args.input, outfile=args.output,
-    #                            camera_params=app_config.camera).extract_all()
 
     # test_serialized('test.json', camera_parameters)
     # Return whisker data from file.
@@ -162,6 +153,12 @@ def extract_whisk_data(video: VideoFileData, config):
 
 
 def segment_video(args, app_config):
+    """
+    Break up a long recording into multiple small ones.  (possibly unnecessary)
+    :param args:
+    :param app_config:
+    :return:
+    """
     name, ext = path.splitext(path.basename(args.input))
 
     cap = cv2.VideoCapture(args.input)
@@ -183,6 +180,13 @@ def segment_video(args, app_config):
 
 
 def align_timestamps(video, args, app_config):
+    """
+    reencode with ffmpeg to align timestamps
+    :param video:
+    :param args:
+    :param app_config:
+    :return:
+    """
     name, ext = path.splitext(video)
     aligned = name + "-aligned" + ext
     command = [app_config.system.ffmpeg_path, '-i', args.input, '-codec:v', 'mpeg4', '-r', '240',

@@ -4,39 +4,11 @@ from os import path
 import attr
 import yaml
 from attr.validators import instance_of
+from attrs_utils import ensure_cls, ensure_enum, is_path_of_file
 from .base import modulePath
 
 Species = Enum('Species', "mouse, rat")
 WhiskColor = Enum('WhiskColor', 'white, black')
-
-
-def ensure_cls(cl):
-    """If the attribute is an instance of cls, pass, else try constructing."""
-
-    def converter(val):
-        if isinstance(val, cl):
-            return val
-        else:
-            return cl(**val)
-
-    return converter
-
-
-def ensure_enum(cl):
-    """If the attribute is an instance of cls, pass, else try constructing."""
-
-    def converter(val):
-        if isinstance(val, cl):
-            return val
-        else:
-            return cl[val]
-
-    return converter
-
-
-def is_path_of_file(instance, attribute, value):
-    if not type(value) == str or not path.isfile(value):
-        raise FileExistsError('{} is not a valid file.'.format(value))
 
 
 def low_smaller_than_high(instance, attribute, value):
@@ -63,7 +35,7 @@ class System(object):
     trace_path = attr.ib(validator=is_path_of_file)
     avidemux_path = attr.ib(validator=is_path_of_file)
     ffmpeg_path = attr.ib(validator=is_path_of_file)
-    whisk_base_path =attr.ib(validator=instance_of(str))
+    whisk_base_path = attr.ib(validator=instance_of(str))
 
 
 @attr.s(frozen=True)
@@ -71,11 +43,13 @@ class Bandpass(object):
     low = attr.ib(validator=low_smaller_than_high)
     high = attr.ib(validator=instance_of(int))
 
+
 @attr.s(frozen=True)
 class Storage(object):
     root_label = attr.ib(validator=instance_of(str))
     output_root = attr.ib(validator=instance_of(str))
     name_format = attr.ib(validator=instance_of(str))
+
 
 @attr.s(frozen=True)
 class Config:
@@ -86,10 +60,10 @@ class Config:
     storage = attr.ib(convert=ensure_cls(Storage))
 
 
-def load(customconfig:str) -> Config:
+def load(customconfig: str) -> Config:
     """
     Read hardware configuration values from a YAML file.
-    :param location: a custom YAML file (optional).  If not specified, values from the default are used.
+    :param customconfig: a custom YAML file (optional).  If not specified, values from the default are used.
     :return: a deserialized dictionary.
     """
     loc = path.join(modulePath, 'resources', 'defaults.yaml') if customconfig is None else customconfig
