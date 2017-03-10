@@ -21,24 +21,26 @@ Options:
 # -i "C:\\Users\\VoyseyG\\Dropbox\\Whisker Tracking\\test videos\\whisking with movement (1).MP4"
 import platform
 import pprint
+import subprocess
 import sys
 from enum import Enum
 from logging import info, error, getLogger, ERROR
-from os import access, W_OK, utime
-from joblib import Parallel, delayed
+from math import ceil
 from multiprocessing import cpu_count
+from os import access, W_OK, utime
+
 import attr
 import cv2
 import progressbar
 from attr.validators import instance_of
 from attrs_utils.interop import from_docopt
-from attrs_utils.validators import ensure_cls, ensure_enum
-import subprocess
-from math import ceil
+from attrs_utils.validators import ensure_enum
+from joblib import Parallel, delayed
 
 import core.yaml_config as yaml_config
 from core._version import __version__
 from core.base import *
+import core.eyes as eyes
 
 MAX_FRAMES = 120000
 
@@ -227,13 +229,15 @@ def prepare_video(args, app_config, chunk: Chunk):
             if ret and (curframe < framecount):
                 curframe += 1
                 pb.update(curframe)
-                # convert to greyscale
-                grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                # invert colors
-                inverted = cv2.bitwise_not(grey)
                 # split in half
-                left_frame = inverted[0:cropped_size[1], 0:cropped_size[0]]
-                right_frame = inverted[0:cropped_size[1], cropped_size[0]:size[0]]
+                left_frame = frame[0:cropped_size[1], 0:cropped_size[0]]
+                right_frame = frame[0:cropped_size[1], cropped_size[0]:size[0]]
+                # measure eye areas
+                left_size, left_area = eyes.process_frame(left_frame)
+                right_size, right_area = eyes.process_frame(right_frame)
+                # greyscale and invert for whisk detection
+                left_frame = cv2.bitwise_not(cv2.cvtColor(left_frame, cv2.COLOR_BGR2GRAY))
+                right_frame = cv2.bitwise_not(cv2.cvtColor(right_frame, cv2.COLOR_BGR2GRAY))
                 # write out
                 vw_left.write(left_frame)
                 vw_right.write(right_frame)
