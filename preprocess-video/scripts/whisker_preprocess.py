@@ -89,11 +89,11 @@ def main(inputargs):
     info('processing file {0}'.format(path.split(args.input)[1]))
     files = segment_video(args, app_config)
 
-    result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
-    print(result)
-    # for f in files.videos:
-    #     result = extract_whisk_data(f, app_config)
-    #     print(result)
+    # result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
+    # print(result)
+    for f in files.videos:
+        result = extract_whisk_data(f, app_config)
+        print(result)
 
     # test_serialized('test.json', camera_parameters)
     # Return whisker data from file.
@@ -155,7 +155,7 @@ def extract_whisk_data(video: VideoFileData, config):
 
 def segment_video(args, app_config):
     """
-    Break up a long recording into multiple small ones.  (possibly unnecessary)
+    Break up a long recording into multiple small ones.
     :param args:
     :param app_config:
     :return:
