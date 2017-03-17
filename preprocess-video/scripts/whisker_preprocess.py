@@ -62,6 +62,7 @@ class VideoFileData(object):
     name = attr.ib(validator=instance_of(str))
     side = attr.ib(convert=ensure_enum(SideOfFace))
     eye = attr.ib()
+    nframes = attr.ib(validator=instance_of(int))
 
     def __attrs_post_init__(self):
         name, ext = path.splitext(self.name)
@@ -69,7 +70,7 @@ class VideoFileData(object):
         self.whiskname = name + ".whiskers"
         self.measname = name + ".measurements"
         self.eyecheck = name + "-eye-checkpoint.csv"
-        self.whiskraw = name + "-whisk-raw.json"
+        self.whiskraw = name + "-whisk-raw.csv"
         self.whiskcheck = name + "-whisk-checkpoint.csv"
         self.summaryfile = name + "-summary.xlsx"
 
@@ -136,25 +137,23 @@ def main(inputargs):
 
 
 def estimate_whisking_from_raw_whiskers(video: VideoFileData, config):
-    call = [config.system.python27_path, config.system.trace_path, '--input', video.whiskname]
     checkpoint = video.whiskraw
-    if not path.isfile(checkpoint):
+    if not (path.isfile(checkpoint) and KEEP_FILES):
+        call = [config.system.python27_path, config.system.trace_path, '--input', video.whiskname, '-o', checkpoint]
         info(f'extracting whisker movement from {video.whiskname}')
         data = subprocess.run(call, stdout=subprocess.PIPE)
         if data.returncode == 0:
-            data = json.loads(data.stdout.decode('utf-8'))
-            with open(checkpoint, 'w') as _:
-                json.dump(data, _)
+            data = pd.read_csv(checkpoint)
         else:
             raise IOError(f"failed to extract from {video.whiskname}")
     else:
-        with open(checkpoint, 'r') as _:
-            data = json.load(_)
+        data = pd.read_csv(checkpoint)
 
-    side = serialized(data, config, path.splitext(video.name)[0])
-    side.to_excel(video.whiskcheck)
-    df = pd.concat([side, video.eye])
-    df.to_excel(video.summaryfile)
+    side = serialized(data, config, path.splitext(path.basename(video.name))[0])
+    side.to_csv(video.whiskcheck)
+    side = side.set_index('frameid')
+    side.join(video.eye)
+    side.to_excel(video.summaryfile)
 
 
 def extract_whisk_data(video: VideoFileData, config):
@@ -201,7 +200,7 @@ def extract_whisk_data(video: VideoFileData, config):
                         raise IOError(f"whisker or measurement file was not saved for {video.name}")
                     if not (path.isfile(video.summaryfile) and KEEP_FILES):
                         estimate_whisking_from_raw_whiskers(video, config)
-                    # return video
+                        # return video
                 else:
                     raise IOError(f"reclassifier failed on {video.name}")
             else:
@@ -237,12 +236,13 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
     :param app_config:
     :return:
     """
-    # initialize storage containers
-    left = VideoFileData(name=chunk.left, side=SideOfFace.left, eye=[])
-    right = VideoFileData(name=chunk.right, side=SideOfFace.right, eye=[])
-
     # grab the video
     cap = cv2.VideoCapture(args.input)
+    # initialize storage containers
+    nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    left = VideoFileData(name=chunk.left, side=SideOfFace.left, eye=[], nframes=nframes)
+    right = VideoFileData(name=chunk.right, side=SideOfFace.right, eye=[], nframes=nframes)
+
     # jump to the right frame
     cap.set(1, chunk.start)
     codec = cv2.VideoWriter_fourcc(*'MPEG')
@@ -254,32 +254,31 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
 
     # compute dimensions of a vertical split
     cropped_size = (round(size[0] / 2), size[1])
-    framecount = chunk.stop - chunk.start
     # open file handles for left and right videos
-    if not (path.isfile(left.name) and path.isfile(right.name) and KEEP_FILES):
+    if not (path.isfile(left.name) and path.isfile(right.name) and path.isfile(right.eyecheck) and path.isfile(left.eyecheck) and KEEP_FILES):
         vw_left = cv2.VideoWriter(filename=left.name, fourcc=codec, fps=framerate, frameSize=cropped_size,
                                   isColor=False)
         vw_right = cv2.VideoWriter(filename=right.name, fourcc=codec, fps=framerate, frameSize=cropped_size,
                                    isColor=False)
         curframe = 0
-        with progressbar.ProgressBar(min_value=0, max_value=framecount) as pb:
+        with progressbar.ProgressBar(min_value=0, max_value=nframes) as pb:
             while cap.isOpened():
                 ret, frame = cap.read()
-                if ret and (curframe < framecount):
-                    curframe += 1
+                if ret and (curframe < nframes):
                     pb.update(curframe)
                     # split in half
                     left_frame = frame[0:cropped_size[1], 0:cropped_size[0]]
                     right_frame = frame[0:cropped_size[1], cropped_size[0]:size[0]]
                     # measure eye areas
-                    left.eye.append(eyes.process_frame(left_frame))
-                    right.eye.append(eyes.process_frame(right_frame))
+                    left.eye.append((curframe, *eyes.process_frame(left_frame)))
+                    right.eye.append((curframe, *eyes.process_frame(right_frame)))
                     # greyscale and invert for whisk detection
                     left_frame = cv2.bitwise_not(cv2.cvtColor(left_frame, cv2.COLOR_BGR2GRAY))
                     right_frame = cv2.bitwise_not(cv2.cvtColor(right_frame, cv2.COLOR_BGR2GRAY))
                     # write out
                     vw_left.write(left_frame)
                     vw_right.write(right_frame)
+                    curframe += 1
                     # uncomment to see live preview.
                     # cv2.imshow('left', left)
                     # cv2.imshow('right', right)
@@ -293,8 +292,10 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             vw_right.release()
             cv2.destroyAllWindows()
             # make checkpoint eye data
-            left.eye = pd.DataFrame(left.eye, columns=('total_area', 'eye_area'))
-            right.eye = pd.DataFrame(right.eye, columns=('total_area', 'eye_area'))
+            left.eye = pd.DataFrame(left.eye, columns=('frameid', 'total_area', 'eye_area'))
+            left.eye = left.eye.set_index('frameid')
+            right.eye = pd.DataFrame(right.eye, columns=('frameid', 'total_area', 'eye_area'))
+            right.eye = right.eye.set_index('frameid')
             left.eye.to_csv(left.eyecheck)
             right.eye.to_csv(right.eyecheck)
     else:

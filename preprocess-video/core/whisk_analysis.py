@@ -28,15 +28,15 @@ def plot_left_right(left, right, fp):
         pdf.savefig(fig)
 
 
-def serialized(json_data, params, name):
-    timeseries = analyze_stack(json_data, params, name)
+def serialized(df: pd.DataFrame, params, name):
+    timeseries = filter_raw(df, params, name)
     return save(path.join(path.expanduser('~'), 'Documents', 'whisk_analysis_data'), timeseries)
 
 
 def test_serialized(pth: str, params: dict):
     with open(pth, 'r') as _:
         whiskdat = json.load(_, object_pairs_hook=OrderedDict)
-    timeseries = analyze_stack(whiskdat, params)
+    timeseries = filter_raw(whiskdat, params)
     save(path.join(path.expanduser('~'), 'Documents', 'whisk_analysis_data'), timeseries)
 
 
@@ -55,45 +55,12 @@ def save(rootdirpath: str, df: pd.DataFrame):
     return df
 
 
-def analyze_stack(whiskdat: {}, params: Config, name: str) -> pd.DataFrame:
-    retval = []
-    for frameID, frame in whiskdat.items():
-        degrees = []
-        for whiskerID, whisker in frame.items():
-            thisx = whisker['x']['__ndarray__']
-            thisy = whisker['y']['__ndarray__']
-            degrees.append(compute_vector_angle(thisx, thisy))
-        mean_degrees = np.mean(degrees)
-        stderr = np.std(degrees) / np.sqrt(len(degrees))
-        retval.append(timedata(frameid=int(frameID),
-                               mean_degrees=mean_degrees,
-                               num_whiskers=len(degrees),
-                               stderr=stderr))
-
-    retval = pd.DataFrame(retval).sort('frameid')
-    retval['mean_degrees'] = retval['mean_degrees'].replace(np.nan, 0, regex=True)
+def filter_raw(whiskdat: pd.DataFrame, params: Config, name: str) -> pd.DataFrame:
     low = 2
     high = 50
     fs = params.camera.framerate
 
-    retval = retval.assign(mean_degrees_filtered=butter_bandpass_filter(retval['mean_degrees'], low, high, fs))
-    retval = retval.assign(time=retval['frameid'] / fs)
-    retval.name = name
-    return retval
-
-
-def compute_vector_angle(x: list, y: list) -> float:
-    """
-    Estimate the vector angle given by the parametric vectors x and y relative to the euclidian axis.
-    :param x:
-    :param y:
-    :return:
-    """
-    # normalize
-    x_end = x[-1] - x[0]
-    y_end = y[-1] - y[0]
-    try:
-        retval = np.arctan(y_end / x_end)
-        return np.degrees(retval)
-    except ZeroDivisionError:
-        return np.nan
+    whiskdat = whiskdat.assign(mean_degrees_filtered=butter_bandpass_filter(whiskdat['mean_degrees'], low, high, fs))
+    whiskdat = whiskdat.assign(time=whiskdat['frameid'] / fs)
+    whiskdat.name = name
+    return whiskdat
