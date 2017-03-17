@@ -28,31 +28,13 @@ def plot_left_right(left, right, fp):
         pdf.savefig(fig)
 
 
-def serialized(df: pd.DataFrame, params, name):
-    timeseries = filter_raw(df, params, name)
-    return save(path.join(path.expanduser('~'), 'Documents', 'whisk_analysis_data'), timeseries)
-
-
-def test_serialized(pth: str, params: dict):
-    with open(pth, 'r') as _:
-        whiskdat = json.load(_, object_pairs_hook=OrderedDict)
-    timeseries = filter_raw(whiskdat, params)
-    save(path.join(path.expanduser('~'), 'Documents', 'whisk_analysis_data'), timeseries)
-
-
-def save(rootdirpath: str, df: pd.DataFrame):
-    now = datetime.now().strftime('%d%b%y-%H%M%S')
-    dirpath = path.join(rootdirpath, now)
-    if not path.exists(dirpath):
-        makedirs(dirpath, exist_ok=True)
-    df.to_csv(path.join(dirpath, df.name + ".csv"), index=False)
+def plot(dirpath, df):
     with PdfPages(filename=path.join(dirpath, df.name + ".pdf")) as pdf:
         ax = df.plot.line(x='frameid', y='mean_degrees', yerr='stderr')
         fig = ax.get_figure()
         fig.dpi = 400
         fig.figsize = (8.5, 11)
         pdf.savefig(fig)
-    return df
 
 
 def filter_raw(whiskdat: pd.DataFrame, params: Config, name: str) -> pd.DataFrame:

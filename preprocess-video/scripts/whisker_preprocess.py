@@ -25,28 +25,25 @@ import subprocess
 import sys
 from enum import Enum
 from logging import info, error, getLogger, ERROR
-import json
-from math import ceil
 from multiprocessing import cpu_count
 from os import access, W_OK, utime
 
 import attr
 import cv2
+import pandas as pd
 import progressbar
 from attr.validators import instance_of
 from attrs_utils.interop import from_docopt
 from attrs_utils.validators import ensure_enum
-import pandas as pd
 from joblib import Parallel, delayed
 
+import core.eyes as eyes
 import core.yaml_config as yaml_config
 from core._version import __version__
 from core.base import *
-import core.eyes as eyes
+from core.whisk_analysis import filter_raw
 
 KEEP_FILES = True
-# MAX_FRAMES = 120000
-from core.whisk_analysis import serialized
 
 
 class SideOfFace(Enum):
@@ -73,6 +70,7 @@ class VideoFileData(object):
         self.whiskraw = name + "-whisk-raw.csv"
         self.whiskcheck = name + "-whisk-checkpoint.csv"
         self.summaryfile = name + "-summary.xlsx"
+        self.labelname = path.splitext(path.basename(name))[0]
 
 
 @attr.s
@@ -94,6 +92,7 @@ class Chunk(object):
 def main(inputargs):
     args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
     __check_requirements()
+    info('read default hardware parameters.')
     app_config = yaml_config.load(args.config)
     if args.print_config:
         print("Detected Configuration Parameters: ")
@@ -104,56 +103,37 @@ def main(inputargs):
         global KEEP_FILES  # ew.
         KEEP_FILES = False
 
-    # get the default parameters for the hardware system
-    info('read default hardware parameters.')
     info(f'processing file {path.split(args.input)[1]}')
     files = segment_video(args, app_config)
-
-    # result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
-    # print(result)
-    for f in files.videos:
-        extract_whisk_data(f, app_config)
-        # test_serialized('test.json', camera_parameters)
-        # Return whisker data from file.
-        # sparams = app_config.system
-        # call = [sparams.python27_path, sparams.trace_path, '--input',
-        #         'C:\\Users\\VoyseyG\\Desktop\\application\\li1.whiskers']
-        # info('extracting whisker movement for file {0}', '')
-        # whisk_data_left = subprocess.check_output(call)
-        # whisk_data_left = json.loads(whisk_data_left.decode('utf-8'))
-        # camera_parameters['name'] = 'left'
-        # left = serialized(whisk_data_left, camera_parameters)
-        #
-        # call = [sparams.python27_path, sparams.trace_path, '--input',
-        #         'C:\\Users\\VoyseyG\\Desktop\\application\\ri2.whiskers']
-        # info('extracting whisker movement for file {0}', '')
-        # whisk_data_right = subprocess.check_output(call)
-        # whisk_data_right = json.loads(whisk_data_right.decode('utf-8'))
-        # camera_parameters['name'] = 'right'
-        # right = serialized(whisk_data_right, camera_parameters)
-        #
-        # plot_left_right(left, right, 'joined.pdf')
-        # plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
+    info('Extracting whisk data for each eye')
+    result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
+    print(result)
+    # # print(result)
+    # for f in files.videos:
+    #     extract_whisk_data(f, app_config)
+    # plot_left_right(left, right, 'joined.pdf')
+    # plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
 
 
 def estimate_whisking_from_raw_whiskers(video: VideoFileData, config):
     checkpoint = video.whiskraw
     if not (path.isfile(checkpoint) and KEEP_FILES):
         call = [config.system.python27_path, config.system.trace_path, '--input', video.whiskname, '-o', checkpoint]
-        info(f'extracting whisker movement from {video.whiskname}')
+        info(f'extracting whisker movement from {video.labelname}')
         data = subprocess.run(call, stdout=subprocess.PIPE)
         if data.returncode == 0:
             data = pd.read_csv(checkpoint)
         else:
-            raise IOError(f"failed to extract from {video.whiskname}")
+            raise IOError(f"failed to extract from {video.labelname}")
     else:
+        info(f"found existing whisker data for {video.labelname}")
         data = pd.read_csv(checkpoint)
 
-    side = serialized(data, config, path.splitext(path.basename(video.name))[0])
+    side = filter_raw(data, config, video.labelname)
     side.to_csv(video.whiskcheck)
     side = side.set_index('frameid')
-    side.join(video.eye)
-    side.to_excel(video.summaryfile)
+    joined = side.join(video.eye)
+    joined.to_excel(video.summaryfile)
 
 
 def extract_whisk_data(video: VideoFileData, config):
@@ -167,48 +147,56 @@ def extract_whisk_data(video: VideoFileData, config):
     reclassify_path = path.join(base, 'reclassify.exe')
     reclassify_args = [video.measname, video.measname, '-n', '-1']
     if not (KEEP_FILES and path.exists(video.whiskname)):
+        info(f'tracing whiskers for {video.labelname}')
         istraced = subprocess.run([trace_path, *trace_args], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     else:
+        info(f'found existing whiskers file for {video.labelname}')
         istraced = subprocess.CompletedProcess(args=[], returncode=0)  # fake a completed run.
     if istraced.returncode == 0:
-        info("traced {}".format(video.name))
+        info(f"trace OK for {video.labelname}")
         if not (KEEP_FILES and path.exists(video.measname)):
+            info(f'measuring whiskers for {video.labelname}')
             ismeasured = subprocess.run([measure_path, *measure_args], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         else:
+            info(f'found existing measurements file for {video.labelname}')
             ismeasured = subprocess.CompletedProcess(args=[], returncode=0)  # fake a completed run.
 
         if ismeasured.returncode == 0:
-            info("measured {}".format(video.name))
+            info(f"measure OK for {video.labelname}")
             if not (KEEP_FILES and path.exists(video.measname)):
+                info(f'classifying whiskers for {video.labelname}')
                 isclassified = subprocess.run([classify_path, *classify_args], stdout=subprocess.PIPE,
                                               stderr=subprocess.PIPE)
             else:
+                info(f'found existing measurements file for {video.labelname}')
                 isclassified = subprocess.CompletedProcess(args=[], returncode=0)  # fake a completed run.
 
             if isclassified.returncode == 0:
-                info("classified {}".format(video.name))
+                info(f"classification OK for {video.labelname}")
                 if not (KEEP_FILES and path.exists(video.measname)):
+                    info(f'reclassifying whiskers for {video.labelname}')
                     isreclassified = subprocess.run([reclassify_path, *reclassify_args], stdout=subprocess.PIPE,
                                                     stderr=subprocess.PIPE)
                 else:
+                    info(f'found existing measurements file for {video.labelname}')
                     isreclassified = subprocess.CompletedProcess(args=[], returncode=0)  # fake a completed run.
 
                 if isreclassified.returncode == 0:
-                    info(f"reclassified {video.name}")
-                    info(f"{video.name} processing complete")
+                    info(f"reclassification OK for {video.labelname}")
+                    info(f"whiskers complete for {video.labelname}")
                     if not path.isfile(video.whiskname) or not path.isfile(video.measname):
                         raise IOError(f"whisker or measurement file was not saved for {video.name}")
                     if not (path.isfile(video.summaryfile) and KEEP_FILES):
                         estimate_whisking_from_raw_whiskers(video, config)
                         # return video
                 else:
-                    raise IOError(f"reclassifier failed on {video.name}")
+                    raise IOError(f"reclassifier failed on {video.labelname}")
             else:
-                raise IOError(f"classifier failed on {video.name}")
+                raise IOError(f"classifier failed on {video.labelname}")
         else:
-            raise IOError(f"measurement failed on {video.name}")
+            raise IOError(f"measurement failed on {video.labelname}")
     else:
-        raise IOError(f"trace failed on {video.name}")
+        raise IOError(f"trace failed on {video.labelname}")
 
 
 def segment_video(args, app_config):
@@ -255,7 +243,10 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
     # compute dimensions of a vertical split
     cropped_size = (round(size[0] / 2), size[1])
     # open file handles for left and right videos
-    if not (path.isfile(left.name) and path.isfile(right.name) and path.isfile(right.eyecheck) and path.isfile(left.eyecheck) and KEEP_FILES):
+    if not (path.isfile(left.name) and path.isfile(right.name) and path.isfile(right.eyecheck) and path.isfile(
+            left.eyecheck) and KEEP_FILES):
+        info('Extracting left and right sides...')
+        info('Detecting eye areas...')
         vw_left = cv2.VideoWriter(filename=left.name, fourcc=codec, fps=framerate, frameSize=cropped_size,
                                   isColor=False)
         vw_right = cv2.VideoWriter(filename=right.name, fourcc=codec, fps=framerate, frameSize=cropped_size,
@@ -296,9 +287,11 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             left.eye = left.eye.set_index('frameid')
             right.eye = pd.DataFrame(right.eye, columns=('frameid', 'total_area', 'eye_area'))
             right.eye = right.eye.set_index('frameid')
+            info('Saved eye data checkpoint file.')
             left.eye.to_csv(left.eyecheck)
             right.eye.to_csv(right.eyecheck)
     else:
+        info('Found existing split video.  Importing existing eye data checkpoint files.')
         left.eye = pd.read_csv(left.eyecheck)
         right.eye = pd.read_csv(right.eyecheck)
     # either return or die.
@@ -310,7 +303,6 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             right.name = aligned_r
             info("wrote {0}".format(left.name))
             info("wrote {0}".format(right.name))
-
             return left, right
         else:
             raise IOError(f"Video pre-processing failed on file {args.input}")
@@ -329,12 +321,14 @@ def __align_timestamps(video, args, app_config):
     name, ext = path.splitext(video)
     aligned = name + "-aligned" + ext
     if not (path.exists(aligned) and KEEP_FILES):
+        info(f'aligning timestamps and creating {aligned}')
         command = [app_config.system.ffmpeg_path, '-i', args.input, '-codec:v', 'mpeg4', '-r', '240',
                    '-qscale:v', '2', '-codec:a', 'copy', aligned]
         # todo replace with pexpect to anticipate overwrites ?
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return aligned if result.returncode == 0 else None
     else:
+        info(f'found previously aligned timestamps for {aligned}')
         return aligned
 
 
@@ -347,7 +341,7 @@ def __check_requirements():
     if system == "windows":
         pass
     else:
-        error("This operating system is not supported (windows only for now)")
+        error(f"{system} is not supported (windows only for now)")
         sys.exit(1)
 
 
