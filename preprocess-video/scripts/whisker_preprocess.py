@@ -104,13 +104,10 @@ def main(inputargs):
         KEEP_FILES = False
 
     info(f'processing file {path.split(args.input)[1]}')
-    files = segment_video(args, app_config)
+    results = segment_video(args, app_config)
     info('Extracting whisk data for each eye')
-    result = Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in files.videos)
-    print(result)
-    # # print(result)
-    # for f in files.videos:
-    #     extract_whisk_data(f, app_config)
+    Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in results.videos)
+
     # plot_left_right(left, right, 'joined.pdf')
     # plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
 
