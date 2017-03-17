@@ -38,10 +38,11 @@ def process_frame(frame):
     opening = cv2.morphologyEx(erosion, cv2.MORPH_OPEN, kernel)
     closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE,
                                kernel)  # this is for further removing small noises and holes in the image
+    # todo: improve this to join large blobs (in case of eyebrow occlusion)
     __show_debug_image('processed', closing)
     return closing.size, np.count_nonzero(closing)
 
 
 if __name__ == "__main__":
-    thisframe = cv2.imread('first.png')
-    process_frame(thisframe)
+    this_frame = cv2.imread('first.png')
+    process_frame(this_frame)

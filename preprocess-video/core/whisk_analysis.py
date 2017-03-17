@@ -9,6 +9,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import seaborn as sns
 from .util.filters import butter_bandpass_filter
+from .yaml_config import Config
 
 plt.style.use('fivethirtyeight')
 matplotlib.use('PDF')
@@ -16,9 +17,9 @@ sns.set(color_codes=True)
 
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")
 
+
 def plot_left_right(left, right, fp):
     with PdfPages(filename=fp) as pdf:
-
         ax = left.plot.line(x='time', y='mean_degrees_filtered')
         right.plot.line(ax=ax, x='time', y='mean_degrees_filtered')
         fig = ax.get_figure()
@@ -26,8 +27,9 @@ def plot_left_right(left, right, fp):
         fig.figsize = (8.5, 11)
         pdf.savefig(fig)
 
-def serialized(json_data, params):
-    timeseries = analyze_stack(json_data, params)
+
+def serialized(json_data, params, name):
+    timeseries = analyze_stack(json_data, params, name)
     return save(path.join(path.expanduser('~'), 'Documents', 'whisk_analysis_data'), timeseries)
 
 
@@ -53,7 +55,7 @@ def save(rootdirpath: str, df: pd.DataFrame):
     return df
 
 
-def analyze_stack(whiskdat: {}, params: dict) -> pd.DataFrame:
+def analyze_stack(whiskdat: {}, params: Config, name: str) -> pd.DataFrame:
     retval = []
     for frameID, frame in whiskdat.items():
         degrees = []
@@ -72,11 +74,11 @@ def analyze_stack(whiskdat: {}, params: dict) -> pd.DataFrame:
     retval['mean_degrees'] = retval['mean_degrees'].replace(np.nan, 0, regex=True)
     low = 2
     high = 50
-    fs = params['framerate']
+    fs = params.camera.framerate
 
     retval = retval.assign(mean_degrees_filtered=butter_bandpass_filter(retval['mean_degrees'], low, high, fs))
-    retval = retval.assign(time=retval['frameid'] / params['framerate'])
-    retval.name = params['name']
+    retval = retval.assign(time=retval['frameid'] / fs)
+    retval.name = name
     return retval
 
 
