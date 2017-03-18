@@ -37,7 +37,7 @@ import core.eyes as eyes
 import core.yaml_config as yaml_config
 from core._version import __version__
 from core.base import *
-from core.whiskers import filter_raw, plot_left_right
+from core.whiskers import extract_whisk_data
 
 KEEP_FILES = True
 
@@ -64,98 +64,15 @@ def main(inputargs):
     info(f'processing file {path.split(args.input)[1]}')
     results = segment_video(args, app_config)
     info('Extracting whisk data for each eye')
-    Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in results.videos)
+    Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
     info('Making summary plots...')
+    from core.analysis import make_plots
     make_plots(results)
-
-
-def estimate_whisking_from_raw_whiskers(video: VideoFileData, config):
-    checkpoint = video.whiskraw
-    if not (path.isfile(checkpoint) and KEEP_FILES):
-        call = [config.system.python27_path, config.system.trace_path, '--input', video.whiskname, '-o', checkpoint]
-        info(f'extracting whisker movement from {video.labelname}')
-        data = subprocess.run(call, stdout=subprocess.PIPE)
-        if data.returncode == 0:
-            data = pd.read_csv(checkpoint)
-        else:
-            raise IOError(f"failed to extract from {video.labelname}")
-    else:
-        info(f"found existing whisker data for {video.labelname}")
-        data = pd.read_csv(checkpoint)
-
-    side = filter_raw(data, config, video.labelname)
-    side.to_csv(video.whiskcheck)
-    side = side.set_index('frameid')
-    joined = side.join(video.eye)
-    joined.to_excel(video.summaryfile)
-
-
-def extract_whisk_data(video: VideoFileData, config):
-    base = config.system.whisk_base_path
-    trace_path = path.join(base, 'trace.exe')
-    trace_args = [video.name, video.whiskname]
-    measure_path = path.join(base, 'measure.exe')
-    measure_args = ['--face', video.side.name, video.whiskname, video.measname]
-    classify_path = path.join(base, 'classify.exe')
-    classify_args = [video.measname, video.measname, video.side.name, '--px2mm', '0.04', '-n', '-1']
-    reclassify_path = path.join(base, 'reclassify.exe')
-    reclassify_args = [video.measname, video.measname, '-n', '-1']
-    if not (KEEP_FILES and path.exists(video.whiskname)):
-        info(f'tracing whiskers for {video.labelname}')
-        istraced = subprocess.run([trace_path, *trace_args], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    else:
-        info(f'found existing whiskers file for {video.labelname}')
-        istraced = subprocess.CompletedProcess(args=[], returncode=0)  # fake a completed run.
-    if istraced.returncode == 0:
-        info(f"trace OK for {video.labelname}")
-        if not (KEEP_FILES and path.exists(video.measname)):
-            info(f'measuring whiskers for {video.labelname}')
-            ismeasured = subprocess.run([measure_path, *measure_args], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        else:
-            info(f'found existing measurements file for {video.labelname}')
-            ismeasured = subprocess.CompletedProcess(args=[], returncode=0)  # fake a completed run.
-
-        if ismeasured.returncode == 0:
-            info(f"measure OK for {video.labelname}")
-            if not (KEEP_FILES and path.exists(video.measname)):
-                info(f'classifying whiskers for {video.labelname}')
-                isclassified = subprocess.run([classify_path, *classify_args], stdout=subprocess.PIPE,
-                                              stderr=subprocess.PIPE)
-            else:
-                info(f'found existing measurements file for {video.labelname}')
-                isclassified = subprocess.CompletedProcess(args=[], returncode=0)  # fake a completed run.
-
-            if isclassified.returncode == 0:
-                info(f"classification OK for {video.labelname}")
-                if not (KEEP_FILES and path.exists(video.measname)):
-                    info(f'reclassifying whiskers for {video.labelname}')
-                    isreclassified = subprocess.run([reclassify_path, *reclassify_args], stdout=subprocess.PIPE,
-                                                    stderr=subprocess.PIPE)
-                else:
-                    info(f'found existing measurements file for {video.labelname}')
-                    isreclassified = subprocess.CompletedProcess(args=[], returncode=0)  # fake a completed run.
-
-                if isreclassified.returncode == 0:
-                    info(f"reclassification OK for {video.labelname}")
-                    info(f"whiskers complete for {video.labelname}")
-                    if not path.isfile(video.whiskname) or not path.isfile(video.measname):
-                        raise IOError(f"whisker or measurement file was not saved for {video.name}")
-                    if not (path.isfile(video.summaryfile) and KEEP_FILES):
-                        estimate_whisking_from_raw_whiskers(video, config)
-                        # return video
-                else:
-                    raise IOError(f"reclassifier failed on {video.labelname}")
-            else:
-                raise IOError(f"classifier failed on {video.labelname}")
-        else:
-            raise IOError(f"measurement failed on {video.labelname}")
-    else:
-        raise IOError(f"trace failed on {video.labelname}")
 
 
 def segment_video(args, app_config):
     """
-    Break up a long recording into multiple small ones.
+    Break up a long recording into multiple small ones.  Coallate split videos into one container per bout.
     :param args:
     :param app_config:
     :return:
@@ -172,7 +89,7 @@ def segment_video(args, app_config):
 
 def split_and_extract_blink(args, app_config, chunk: Chunk):
     """
-    Split a video into left and right face sides, and extract eye areas
+    Split a video into left and right face sides for whisking detection, and extract eye areas along the way.
     :param chunk:
     :param args:
     :param app_config:
@@ -262,15 +179,6 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             raise IOError(f"Video pre-processing failed on file {args.input}")
     else:
         raise IOError(f"Video pre-processing failed on file {args.input}")
-
-
-def make_plots(results: [VideoFileData]):
-    """
-    Produce summary plots for a recorded bout.
-    :param results:
-    :return:
-    """
-    plot_left_right(results)
 
 
 def __align_timestamps(video, args, app_config):

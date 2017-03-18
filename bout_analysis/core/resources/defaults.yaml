@@ -15,7 +15,7 @@ system:
   python27_path:  'C:\\Python27\\python.exe'
   trace_path:     'C:\\Users\\VoyseyG\\Projects\\whisk\\python\\trace.py'
   avidemux_path:  'C:\\Program Files\\Avidemux 2.6 - 64 bits\\avidemux_cli.exe'
-  ffmpeg_path:    'C:\\Users\\VoyseyG\\Projects\\mousetracker\\preprocess-video\\core\\resources\\ffmpeg-win64\\bin\\ffmpeg.exe'
+  ffmpeg_path:    'C:\\Users\\VoyseyG\\Projects\\mousetracker\\bout_analysis\\core\\resources\\ffmpeg-win64\\bin\\ffmpeg.exe'
   whisk_base_path:  'C:\\Program Files\\WhiskerTracking\\bin\\'
 # storage constants
 storage:
