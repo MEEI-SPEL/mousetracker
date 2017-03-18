@@ -25,7 +25,7 @@ import subprocess
 import sys
 from logging import info, error, getLogger, ERROR
 from multiprocessing import cpu_count
-from os import access, W_OK, utime
+from os import access, W_OK, utime, remove
 
 import cv2
 import pandas as pd
@@ -40,15 +40,6 @@ from core.base import *
 from core.whisk_analysis import filter_raw, plot_left_right
 
 KEEP_FILES = True
-
-
-def make_plots(results: [VideoFileData]):
-    """
-    Produce summary plots for a recorded bout.
-    :param results:
-    :return:
-    """
-    plot_left_right(results)
 
 
 def main(inputargs):
@@ -273,6 +264,15 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
         raise IOError(f"Video pre-processing failed on file {args.input}")
 
 
+def make_plots(results: [VideoFileData]):
+    """
+    Produce summary plots for a recorded bout.
+    :param results:
+    :return:
+    """
+    plot_left_right(results)
+
+
 def __align_timestamps(video, args, app_config):
     """
     reencode a video file with ffmpeg to align timestamps for whisker extraction.
@@ -285,9 +285,10 @@ def __align_timestamps(video, args, app_config):
     aligned = name + "-aligned" + ext
     if not (path.exists(aligned) and KEEP_FILES):
         info(f'aligning timestamps and creating {aligned}')
+        if path.exists(aligned):
+            remove(aligned)
         command = [app_config.system.ffmpeg_path, '-i', args.input, '-codec:v', 'mpeg4', '-r', '240',
                    '-qscale:v', '2', '-codec:a', 'copy', aligned]
-        # todo replace with pexpect to anticipate overwrites ?
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return aligned if result.returncode == 0 else None
     else:
