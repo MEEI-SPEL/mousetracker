@@ -1,0 +1,29 @@
+# operational defaults to describe hardware components in the system.
+
+
+# the optical specifications
+camera:
+  width: 1080
+  height: 720
+  framerate: 240
+# the subject specifications
+animal:
+  species: 'rat'
+  whisker_color:  'white'
+# runtime constants
+system:
+  python27_path:  'C:\\Python27\\python.exe'
+  trace_path:     'C:\\Users\\VoyseyG\\Projects\\whisk\\python\\trace.py'
+  avidemux_path:  'C:\\Program Files\\Avidemux 2.6 - 64 bits\\avidemux_cli.exe'
+  ffmpeg_path:    'C:\\Users\\VoyseyG\\Projects\\mousetracker\\preprocess-video\\core\\resources\\ffmpeg-win64\\bin\\ffmpeg.exe'
+  whisk_base_path:  'C:\\Program Files\\WhiskerTracking\\bin\\'
+# storage constants
+storage:
+  root_label:       '.whisk-output-root'
+  output_root:      'whisk-output'
+  name_format:     '%d %b %y - %H%M'
+
+#analysis parameters
+bandpass:
+  low: 2 #in Hz
+  high: 50 #in Hz
