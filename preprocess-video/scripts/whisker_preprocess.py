@@ -5,8 +5,8 @@ Whisker Preprocessor.   Extracts bilateral whisking and eyeblink data from a vid
 Usage:
     whisker_preprocess -h | --help
     whisker_preprocess --version
-    whisker_preprocess ([-i <input_file> | --input <input_file>] | [ --config <config_file> | --print_config] ) [(-o <output_file> | --output <output_file>)]
-                       [(-v | --verbose)] [--clean]
+    whisker_preprocess ([-i <input_file> | --input <input_file>] | [ --config <config_file> | --print_config] )
+                       [(-o <output_file> | --output <output_file>)] [(-v | --verbose)] [--clean]
 
 Options:
     -h --help                   Show this screen and exit.
@@ -41,12 +41,15 @@ import core.eyes as eyes
 import core.yaml_config as yaml_config
 from core._version import __version__
 from core.base import *
-from core.whisk_analysis import filter_raw
+from core.whisk_analysis import filter_raw, plot_left_right
 
 KEEP_FILES = True
 
 
 class SideOfFace(Enum):
+    """
+    Label for which side of the face is being analyzed.  Direction is animal-relative not video relative.
+    """
     left = 1
     right = 2
 
@@ -83,13 +86,32 @@ class RecordingSessionData(object):
 
 @attr.s
 class Chunk(object):
+    """
+    This container holds the file paths to the split and aligned video files to be analyzed,
+    as well as start and stop frame IDs if the recording needs to be analyzed in chunks.
+    """
     left = attr.ib(validator=instance_of(str))
     right = attr.ib(validator=instance_of(str))
     start = attr.ib(validator=instance_of(int))
     stop = attr.ib(validator=instance_of(int))
 
 
+def make_plots(results: [VideoFileData]):
+    """
+    Produce summary plots for a recorded bout.
+    :param results:
+    :return:
+    """
+    plot_left_right(results)
+
+
+
 def main(inputargs):
+    """
+    Application entry point.  Analyze a recorded bout based on the parameters laid out in a config file.
+    :param inputargs:
+    :return: A POSIX exit code.
+    """
     args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
     __check_requirements()
     info('read default hardware parameters.')
@@ -107,9 +129,8 @@ def main(inputargs):
     results = segment_video(args, app_config)
     info('Extracting whisk data for each eye')
     Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config) for f in results.videos)
-
-    # plot_left_right(left, right, 'joined.pdf')
-    # plot_left_right(left.iloc[500:900], right.iloc[500:900], 'zoomed.pdf')
+    info('Making summary plots...')
+    make_plots(results)
 
 
 def estimate_whisking_from_raw_whiskers(video: VideoFileData, config):

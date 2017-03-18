@@ -8,6 +8,8 @@ import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+from scripts.whisker_preprocess import VideoFileData
 from .util.filters import butter_bandpass_filter
 from .yaml_config import Config
 
@@ -18,7 +20,7 @@ sns.set(color_codes=True)
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")
 
 
-def plot_left_right(left, right, fp):
+def plot_left_right(results: [VideoFileData]):
     with PdfPages(filename=fp) as pdf:
         ax = left.plot.line(x='time', y='mean_degrees_filtered')
         right.plot.line(ax=ax, x='time', y='mean_degrees_filtered')
