@@ -44,6 +44,11 @@ class RecordingSessionData(object):
     """
     videos = attr.ib()
 
+    def __attrs_post_init__(self):
+        self.rootdir = path.split(self.videos[0].name)[0] if len(self.videos) > 0 else None
+        self.summaryfigure = path.join(self.rootdir, "summary_plots.pdf") if self.rootdir else None
+        self.summarystats = path.join(self.rootdir, "summary_data.csv") if self.rootdir else None
+
 
 @attr.s
 class Chunk(object):
