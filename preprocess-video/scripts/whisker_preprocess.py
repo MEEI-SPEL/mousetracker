@@ -23,18 +23,14 @@ import platform
 import pprint
 import subprocess
 import sys
-from enum import Enum
 from logging import info, error, getLogger, ERROR
 from multiprocessing import cpu_count
 from os import access, W_OK, utime
 
-import attr
 import cv2
 import pandas as pd
 import progressbar
-from attr.validators import instance_of
 from attrs_utils.interop import from_docopt
-from attrs_utils.validators import ensure_enum
 from joblib import Parallel, delayed
 
 import core.eyes as eyes
@@ -46,56 +42,6 @@ from core.whisk_analysis import filter_raw, plot_left_right
 KEEP_FILES = True
 
 
-class SideOfFace(Enum):
-    """
-    Label for which side of the face is being analyzed.  Direction is animal-relative not video relative.
-    """
-    left = 1
-    right = 2
-
-
-@attr.s
-class VideoFileData(object):
-    """
-    This class holds the file locations for the source video, analyzed results, and raw eye data.
-    """
-    name = attr.ib(validator=instance_of(str))
-    side = attr.ib(convert=ensure_enum(SideOfFace))
-    eye = attr.ib()
-    nframes = attr.ib(validator=instance_of(int))
-
-    def __attrs_post_init__(self):
-        name, ext = path.splitext(self.name)
-        self.basename = name
-        self.whiskname = name + ".whiskers"
-        self.measname = name + ".measurements"
-        self.eyecheck = name + "-eye-checkpoint.csv"
-        self.whiskraw = name + "-whisk-raw.csv"
-        self.whiskcheck = name + "-whisk-checkpoint.csv"
-        self.summaryfile = name + "-summary.xlsx"
-        self.labelname = path.splitext(path.basename(name))[0]
-
-
-@attr.s
-class RecordingSessionData(object):
-    """
-    This class holds all of the analysis results for one video bout
-    """
-    videos = attr.ib()
-
-
-@attr.s
-class Chunk(object):
-    """
-    This container holds the file paths to the split and aligned video files to be analyzed,
-    as well as start and stop frame IDs if the recording needs to be analyzed in chunks.
-    """
-    left = attr.ib(validator=instance_of(str))
-    right = attr.ib(validator=instance_of(str))
-    start = attr.ib(validator=instance_of(int))
-    stop = attr.ib(validator=instance_of(int))
-
-
 def make_plots(results: [VideoFileData]):
     """
     Produce summary plots for a recorded bout.
@@ -103,7 +49,6 @@ def make_plots(results: [VideoFileData]):
     :return:
     """
     plot_left_right(results)
-
 
 
 def main(inputargs):

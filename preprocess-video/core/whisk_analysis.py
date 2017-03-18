@@ -1,13 +1,11 @@
-import numpy as np
-import pandas as pd
-import json
-from os import path, makedirs
-from datetime import datetime
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
+from os import path
+
 import matplotlib
-from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
+from matplotlib.backends.backend_pdf import PdfPages
 
 from scripts.whisker_preprocess import VideoFileData
 from .util.filters import butter_bandpass_filter
