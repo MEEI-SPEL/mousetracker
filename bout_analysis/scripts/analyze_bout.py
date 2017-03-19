@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """
-Whisker Preprocessor.   Extracts bilateral whisking and eyeblink data from a video snippet.
+Bout Analyzer.   Extracts bilateral whisking and eyeblink data from a video snippet.
 
 Usage:
-    whisker_preprocess -h | --help
-    whisker_preprocess --version
-    whisker_preprocess ([-i <input_file> | --input <input_file>] | [ --config <config_file> | --print_config] )
-                       [(-o <output_file> | --output <output_file>)] [(-v | --verbose)] [--clean]
+    analyze_bout.py -h | --help
+    analyze_bout.py --version
+    analyze_bout.py ([-i <input_file> | --input <input_file>] | [ --config <config_file> | --print_config] )
+                    [(-o <output_file> | --output <output_file>)] [(-v | --verbose)] [--clean]
 
 Options:
     -h --help                   Show this screen and exit.
@@ -25,7 +25,7 @@ import subprocess
 import sys
 from logging import info, error, getLogger, ERROR
 from multiprocessing import cpu_count
-from os import access, W_OK, utime, remove
+from os import access, W_OK, utime, remove, mkdir
 
 import cv2
 import pandas as pd
@@ -56,7 +56,7 @@ def main(inputargs):
         print("Detected Configuration Parameters: ")
         pprint.pprint(attr.asdict(app_config), depth=5)
         return 0
-    __validate_args(args)
+    __validate_args(args, app_config)
     if args.clean:
         global KEEP_FILES  # ew.
         KEEP_FILES = False
@@ -217,7 +217,7 @@ def __check_requirements():
         sys.exit(1)
 
 
-def __validate_args(args):
+def __validate_args(args, app_config):
     """
     Makes sure the arguments passed in are reasonable.  Sets the default value for output, if required.  Configures
     logging level.
@@ -228,9 +228,16 @@ def __validate_args(args):
         raise FileNotFoundError(f'{args.input} not found!')
     else:
         if not args.output:
-            args.output = path.split(args.input)[0]
+            videoname = path.splitext(path.basename(args.input))[0]
+            args.output = path.join(path.split(args.input)[0], videoname)
+            if not path.exists(args.output):
+                mkdir(args.output)
+                __touch(path.join(args.output, app_config.storage.root_label))
     if not access(args.output, W_OK):
         raise PermissionError(f'{args.output} is not writable!')
+    else:
+        if not path.exists(path.join(args.output, app_config.storage.root_label)):
+            __touch(path.join(args.output, app_config.storage.root_label))
     if not args.verbose:
         getLogger().setLevel(ERROR)
     if args.config and not path.isfile(args.config):
