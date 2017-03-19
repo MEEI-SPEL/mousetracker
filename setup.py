@@ -1,11 +1,12 @@
 from setuptools import setup, find_packages, Extension
 # makes __version__ a local variable
-exec(open('core/_version.py').read())
+exec(open('bout_analysis/core/_version.py').read())
 setup(
     name='mousetracker',
     version=__version__,
     packages=find_packages(),
-    package_dir={'': 'bout_analysis'},
+    scripts=['bout_analysis/scripts/analyze_bout.py',
+            ],
     url='https://github.com/MEEI-SPEL/mousetracker',
     license='',
     author='Graham Voysey',
