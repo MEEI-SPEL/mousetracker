@@ -1,4 +1,4 @@
-bout_analysis/core/resources/ffmpeg-win64
+ffmpeg-win64/
 *.parameters
 *.detectorbank
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and Webstorm
