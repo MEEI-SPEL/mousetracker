@@ -33,7 +33,7 @@ import progressbar
 from attrs_utils.interop import from_docopt
 from joblib import Parallel, delayed
 
-import core.eyes as eyes
+from core import eyes
 import core.yaml_config as yaml_config
 from core._version import __version__
 from core.base import *
