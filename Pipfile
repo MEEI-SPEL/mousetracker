@@ -1,3 +1,14 @@
 [[source]]
 url = "https://pypi.python.org/simple"
 verify_ssl = true
+
+[packages]
+attrs = "*"
+docopt = "*"
+matplotlib = "*"
+numpy = "*"
+opencv-python = "*"
+progressbar2 = "*"
+scipy = "*"
+seaborn = "*"
+PyYAML = "*"

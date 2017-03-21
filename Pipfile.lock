@@ -1,0 +1,77 @@
+{
+    "_meta": {
+        "hash": {
+            "sha256": "9d3227d2c7a7db2ce3bd5a08783261295842069c81b461b2b8d81e6804237f3b"
+        },
+        "requires": {},
+        "sources": [
+            {
+                "url": "https://pypi.python.org/simple",
+                "verify_ssl": true
+            }
+        ]
+    },
+    "default": {
+        "Cycler": {
+            "hash": "sha256:1d8a5ae1ff6c5cf9b93e8811e581232ad8920aeec647c37316ceac982b08cb2d",
+            "version": "==0.10.0"
+        },
+        "PyYAML": {
+            "hash": "sha256:592766c6303207a20efc445587778322d7f73b161bd994f227adaa341ba212ab",
+            "version": "==3.12"
+        },
+        "attrs": {
+            "hash": "sha256:c59426b15b45e39a7bc408eb6ba7e7188d9532764f873cc691199ddd975c97ef",
+            "version": "==16.3.0"
+        },
+        "docopt": {
+            "hash": "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491",
+            "version": "==0.6.2"
+        },
+        "matplotlib": {
+            "hash": "sha256:2336234af83a34f933e44774b22dc338008b65c3c1b8c0ec5ebf030fa2dd810d",
+            "version": "==2.0.0"
+        },
+        "numpy": {
+            "hash": "sha256:5dd60892710df0ef654bbf4d1e3cb53ac79845e55a96e4a26dd47218e06d819a",
+            "version": "==1.12.1"
+        },
+        "opencv-python": {
+            "hash": "sha256:fdb8032d1617e9812b1ebc382f16bee59e7daca89f8f7b325ee8dbb0d863557e",
+            "version": "==3.2.0.6"
+        },
+        "progressbar2": {
+            "hash": "sha256:a9c2aeddfe54c6ac548b26460d4388af830629ca0bd08974984a609df27ca3e8",
+            "version": "==3.16.0"
+        },
+        "pyparsing": {
+            "hash": "sha256:fee43f17a9c4087e7ed1605bd6df994c6173c1e977d7ade7b651292fab2bd010",
+            "version": "==2.2.0"
+        },
+        "python-dateutil": {
+            "hash": "sha256:537bf2a8f8ce6f6862ad705cd68f9e405c0b5db014aa40fa29eab4335d4b1716",
+            "version": "==2.6.0"
+        },
+        "python-utils": {
+            "hash": "sha256:670f9b992ebfc005329fd9740408f2a704e595d64c8f8da83f7977618dba4acc",
+            "version": "==2.0.1"
+        },
+        "pytz": {
+            "hash": "sha256:a1ea35e87a63c7825846d5b5c81d23d668e8a102d3b1b465ce95afe1b3a2e065",
+            "version": "==2016.10"
+        },
+        "scipy": {
+            "hash": "sha256:f5a3a7dcbeb345c227770029870aeb547a3c207a6cbc0106d6157139fd0c23e9",
+            "version": "==0.19.0"
+        },
+        "seaborn": {
+            "hash": "sha256:fa274344b1ee72f723bab751c40a5c671801d47a29ee9b5e69fcf63a18ce5c5d",
+            "version": "==0.7.1"
+        },
+        "six": {
+            "hash": "sha256:0ff78c403d9bccf5a425a6d31a12aa6b47f1c21ca4dc2573a7e2f32a97335eb1",
+            "version": "==1.10.0"
+        }
+    },
+    "develop": {}
+}
