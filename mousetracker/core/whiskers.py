@@ -24,20 +24,22 @@ def estimate_whisking_from_raw_whiskers(video: VideoFileData, config, keep_files
     if not (path.isfile(checkpoint) and keep_files):
         call = [config.system.python27_path, config.system.trace_path, '--input', video.whiskname, '-o', checkpoint]
         info(f'extracting whisker movement from {video.labelname}')
-        data = subprocess.run(call, stdout=subprocess.PIPE)
+        data = subprocess.run(call, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if data.returncode == 0:
             data = pd.read_csv(checkpoint)
         else:
-            raise IOError(f"failed to extract from {video.labelname}")
+            raise IOError(f"failed to extract from {video.labelname}: {repr(data.stderr)}")
     else:
         info(f"found existing whisker data for {video.labelname}")
         data = pd.read_csv(checkpoint)
 
     side = filter_raw(data, config, video.labelname)
+    #rename columns to match side of face.
+    side.columns = (side.columns[0], *[video.side.name+'_'+x for x in side.columns[1:]])
     side.to_csv(video.whiskcheck)
     side = side.set_index('frameid')
     joined = side.join(video.eye)
-    joined.to_excel(video.summaryfile)
+    joined.to_csv(video.summaryfile)
 
 
 def extract_whisk_data(video: VideoFileData, config, keep_files):

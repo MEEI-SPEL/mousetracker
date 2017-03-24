@@ -33,7 +33,7 @@ class VideoFileData(object):
         self.eyecheck = name + "-eye-checkpoint.csv"
         self.whiskraw = name + "-whisk-raw.csv"
         self.whiskcheck = name + "-whisk-checkpoint.csv"
-        self.summaryfile = name + "-summary.xlsx"
+        self.summaryfile = name + "-summary.csv"
         self.labelname = path.splitext(path.basename(name))[0]
 
 

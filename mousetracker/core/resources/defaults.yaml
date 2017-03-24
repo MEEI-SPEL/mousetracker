@@ -10,6 +10,7 @@ camera:
 animal:
   species: 'rat'
   whisker_color:  'white'
+  eye_color: 'red'
 # runtime constants
 system:
   python27_path:  'C:\\Python27\\python.exe'

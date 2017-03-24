@@ -66,6 +66,9 @@ def main(inputargs):
     Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
     info('Making summary plots...')
     from core.analysis import make_plots
+    # join left and right
+    wholeface = pd.concat([pd.read_csv(f.summaryfile) for f in results.videos], axis=1)
+    wholeface.to_csv(results.summarystats)
     make_plots(results)
 
 
@@ -153,10 +156,11 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             vw_right.release()
             cv2.destroyAllWindows()
             # make checkpoint eye data
-            left.eye = pd.DataFrame(left.eye, columns=('frameid', 'total_area', 'eye_area'))
+            left.eye = pd.DataFrame(left.eye, columns=('frameid', left.side.name+'_total_area', left.side.name+'_eye_area'))
             left.eye = left.eye.set_index('frameid')
-            right.eye = pd.DataFrame(right.eye, columns=('frameid', 'total_area', 'eye_area'))
+            right.eye = pd.DataFrame(right.eye, columns=('frameid', right.side.name+'_total_area', right.side.name+'_eye_area'))
             right.eye = right.eye.set_index('frameid')
+
             info('Saved eye data checkpoint file.')
             left.eye.to_csv(left.eyecheck)
             right.eye.to_csv(right.eyecheck)
@@ -194,7 +198,8 @@ def __align_timestamps(video, args, app_config):
         info(f'aligning timestamps and creating {aligned}')
         if path.exists(aligned):
             remove(aligned)
-        command = [app_config.system.ffmpeg_path, '-i', args.input, '-codec:v', 'mpeg4', '-r', '240',
+        framerate = str(app_config.camera.framerate)
+        command = [app_config.system.ffmpeg_path, '-i', args.input, '-codec:v', 'mpeg4', '-r', framerate,
                    '-qscale:v', '2', '-codec:a', 'copy', aligned]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return aligned if result.returncode == 0 else None

@@ -9,6 +9,7 @@ from .base import modulePath
 
 Species = Enum('Species', "mouse, rat")
 WhiskColor = Enum('WhiskColor', 'white, black')
+EyeColor = Enum('EyeColor', 'red')
 
 
 def low_smaller_than_high(instance, attribute, value):
@@ -27,6 +28,7 @@ class Camera(object):
 class Animal(object):
     species = attr.ib(convert=ensure_enum(Species))
     whisker_color = attr.ib(convert=ensure_enum(WhiskColor))
+    eye_color = attr.ib(convert=ensure_enum(EyeColor))
 
 
 @attr.s(frozen=True)
