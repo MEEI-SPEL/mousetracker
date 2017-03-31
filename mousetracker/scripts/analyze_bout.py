@@ -158,9 +158,10 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             # make checkpoint eye data
             left.eye = pd.DataFrame(left.eye, columns=('frameid', left.side.name+'_total_area', left.side.name+'_eye_area'))
             left.eye = left.eye.set_index('frameid')
+            left.eye[left.side.name+'_scaled'] = left.eye[left.side.name+'_eye_area'] / max(abs(left.eye[left.side.name+'_eye_area'])) * 100
             right.eye = pd.DataFrame(right.eye, columns=('frameid', right.side.name+'_total_area', right.side.name+'_eye_area'))
             right.eye = right.eye.set_index('frameid')
-
+            right.eye[right.side.name + '_scaled'] = right.eye[right.side.name + '_eye_area'] / max(abs(right.eye[right.side.name + '_eye_area'])) * 100
             info('Saved eye data checkpoint file.')
             left.eye.to_csv(left.eyecheck)
             right.eye.to_csv(right.eyecheck)
