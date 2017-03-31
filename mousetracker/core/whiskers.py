@@ -56,7 +56,8 @@ def extract_whisk_data(video: VideoFileData, config, keep_files):
     measure_path = path.join(base, 'measure.exe')
     measure_args = ['--face', video.side.name, video.whiskname, video.measname]
     classify_path = path.join(base, 'classify.exe')
-    classify_args = [video.measname, video.measname, video.side.name, '--px2mm', '0.04', '-n', '-1']
+    classify_args = [video.measname, video.measname, video.side.name, '--px2mm', str(config.camera.px2mm),
+                     '-n', str(config.animal.num_whiskers)]
     reclassify_path = path.join(base, 'reclassify.exe')
     reclassify_args = [video.measname, video.measname, '-n', '-1']
     if not (keep_files and path.exists(video.whiskname)):

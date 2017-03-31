@@ -22,6 +22,7 @@ class Camera(object):
     width = attr.ib(validator=instance_of(int))
     height = attr.ib(validator=instance_of(int))
     framerate = attr.ib(validator=instance_of(int))
+    px2mm = attr.ib(validator=instance_of(float))
 
 
 @attr.s(frozen=True)
@@ -29,6 +30,7 @@ class Animal(object):
     species = attr.ib(convert=ensure_enum(Species))
     whisker_color = attr.ib(convert=ensure_enum(WhiskColor))
     eye_color = attr.ib(convert=ensure_enum(EyeColor))
+    num_whiskers = attr.ib(validator=instance_of(int))
 
 
 @attr.s(frozen=True)

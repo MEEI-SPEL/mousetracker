@@ -6,11 +6,13 @@ camera:
   width: 1080
   height: 720
   framerate: 240
+  px2mm: 0.04
 # the subject specifications
 animal:
   species: 'rat'
   whisker_color:  'white'
   eye_color: 'red'
+  num_whiskers: 5
 # runtime constants
 system:
   python27_path:  'C:\\Python27\\python.exe'
