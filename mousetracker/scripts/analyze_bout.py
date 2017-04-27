@@ -63,10 +63,16 @@ def main(inputargs):
     info(f'processing file {path.split(args.input)[1]}')
     results = segment_video(args, app_config)
     info('Extracting whisk data for each eye')
-    Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
+    #Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
+    for f in results.videos:
+        extract_whisk_data(f, app_config, KEEP_FILES)
+    analyze_bout(results=results)
+
+
+def analyze_bout(results: RecordingSessionData):
     info('Making summary plots...')
     from core.analysis import make_plots
-    # join left and right
+    # join left and right dataframes into one summary dataframe for the entire bout
     wholeface = pd.concat([pd.read_csv(f.summaryfile) for f in results.videos], axis=1)
     wholeface.to_csv(results.summarystats)
     make_plots(results)
@@ -74,7 +80,7 @@ def main(inputargs):
 
 def segment_video(args, app_config):
     """
-    Break up a long recording into multiple small ones.  Coallate split videos into one container per bout.
+    Break up a long recording into multiple small ones.  Collate split videos into one container per bout.
     :param args:
     :param app_config:
     :return:
@@ -211,7 +217,7 @@ def __align_timestamps(video, args, app_config):
         if path.exists(aligned):
             remove(aligned)
         framerate = str(app_config.camera.framerate)
-        command = [app_config.system.ffmpeg_path, '-i', args.input, '-codec:v', 'mpeg4', '-r', framerate,
+        command = [app_config.system.ffmpeg_path, '-i', video, '-codec:v', 'mpeg4', '-r', framerate,
                    '-qscale:v', '2', '-codec:a', 'copy', aligned]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return aligned if result.returncode == 0 else None
