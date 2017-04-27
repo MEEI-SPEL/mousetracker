@@ -5,9 +5,8 @@ from logging import info
 import pandas as pd
 
 from .base import *
-from .util.filters import butter_bandpass_filter
+from .util.filters import lowpass
 from .yaml_config import Config
-
 
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")
 
@@ -34,7 +33,7 @@ def estimate_whisking_from_raw_whiskers(video: VideoFileData, config, keep_files
         data = pd.read_csv(checkpoint)
 
     side = filter_raw(data, config, video.labelname)
-    #rename columns to match side of face.
+    # rename columns to match side of face.
     side.columns = (side.columns[0], *[video.side.name+'_'+x for x in side.columns[1:]])
     side.to_csv(video.whiskcheck)
     side = side.set_index('frameid')
@@ -114,11 +113,8 @@ def extract_whisk_data(video: VideoFileData, config, keep_files):
 
 
 def filter_raw(whiskdat: pd.DataFrame, params: Config, name: str) -> pd.DataFrame:
-    low = 2
-    high = 50
     fs = params.camera.framerate
-
-    whiskdat = whiskdat.assign(mean_degrees_filtered=butter_bandpass_filter(whiskdat['mean_degrees'], low, high, fs))
+    whiskdat = whiskdat.assign(mean_degrees_filtered=lowpass(data=whiskdat['mean_degrees'], fs=fs))
     whiskdat = whiskdat.assign(time=whiskdat['frameid'] / fs)
     whiskdat.name = name
     return whiskdat
