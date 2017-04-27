@@ -101,8 +101,12 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
     cap = cv2.VideoCapture(args.input)
     # initialize storage containers
     nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    left = VideoFileData(name=chunk.left, side=SideOfFace.left, eye=[], nframes=nframes)
-    right = VideoFileData(name=chunk.right, side=SideOfFace.right, eye=[], nframes=nframes)
+    left_column_names = ['frameid', *[SideOfFace.left.name + "_" + x for x in attr.asdict(eyes.EyeStats()).keys()]]
+    right_column_names = ['frameid', *[SideOfFace.right.name + "_" + x for x in attr.asdict(eyes.EyeStats()).keys()]]
+    left = VideoFileData(name=chunk.left, side=SideOfFace.left, eye=pd.DataFrame(columns=left_column_names),
+                         nframes=nframes)
+    right = VideoFileData(name=chunk.right, side=SideOfFace.right, eye=pd.DataFrame(columns=right_column_names),
+                          nframes=nframes)
 
     # jump to the right frame
     cap.set(1, chunk.start)
@@ -134,8 +138,12 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
                     left_frame = frame[0:cropped_size[1], 0:cropped_size[0]]
                     right_frame = frame[0:cropped_size[1], cropped_size[0]:size[0]]
                     # measure eye areas
-                    left.eye.append((curframe, *eyes.compute_areas(left_frame)))
-                    right.eye.append((curframe, *eyes.compute_areas(right_frame)))
+                    left_eye = eyes.compute_areas(left_frame)
+                    left_eye_renamed = {SideOfFace.left.name + "_" + k: v for k, v in left_eye.__dict__.items()}
+                    right_eye = eyes.compute_areas(right_frame)
+                    right_eye_renamed = {SideOfFace.right.name + "_" + k: v for k, v in right_eye.__dict__.items()}
+                    left.eye = left.eye.append({'frameid': curframe, **left_eye_renamed}, ignore_index=True)
+                    right.eye = right.eye.append({'frameid': curframe, **right_eye_renamed}, ignore_index=True)
                     # greyscale and invert for whisk detection
                     left_frame = cv2.bitwise_not(cv2.cvtColor(left_frame, cv2.COLOR_BGR2GRAY))
                     right_frame = cv2.bitwise_not(cv2.cvtColor(right_frame, cv2.COLOR_BGR2GRAY))
@@ -156,12 +164,15 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             vw_right.release()
             cv2.destroyAllWindows()
             # make checkpoint eye data
-            left.eye = pd.DataFrame(left.eye, columns=('frameid', left.side.name+'_total_area', left.side.name+'_eye_area'))
+
             left.eye = left.eye.set_index('frameid')
-            left.eye[left.side.name+'_scaled'] = left.eye[left.side.name+'_eye_area'] / max(abs(left.eye[left.side.name+'_eye_area'])) * 100
-            right.eye = pd.DataFrame(right.eye, columns=('frameid', right.side.name+'_total_area', right.side.name+'_eye_area'))
+            left.eye[left.side.name + '_scaled'] = left.eye[left.side.name + '_fitted_area'] / max(
+                abs(left.eye[left.side.name + '_fitted_area'])) * 100
+
             right.eye = right.eye.set_index('frameid')
-            right.eye[right.side.name + '_scaled'] = right.eye[right.side.name + '_eye_area'] / max(abs(right.eye[right.side.name + '_eye_area'])) * 100
+            right.eye[right.side.name + '_scaled'] = right.eye[right.side.name + '_fitted_area'] / max(
+                abs(right.eye[right.side.name + '_fitted_area'])) * 100
+
             info('Saved eye data checkpoint file.')
             left.eye.to_csv(left.eyecheck)
             right.eye.to_csv(right.eyecheck)
