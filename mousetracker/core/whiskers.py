@@ -5,7 +5,7 @@ from logging import info
 import pandas as pd
 
 from .base import *
-from .util.filters import lowpass
+from .util.signal_processing import lowpass
 from .yaml_config import Config
 
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")

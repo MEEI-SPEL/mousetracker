@@ -71,11 +71,11 @@ def main(inputargs):
 
 def analyze_bout(results: RecordingSessionData):
     info('Making summary plots...')
-    from core.analysis import make_plots
+    from core.analysis import make_summary_plots
     # join left and right dataframes into one summary dataframe for the entire bout
     wholeface = pd.concat([pd.read_csv(f.summaryfile) for f in results.videos], axis=1)
     wholeface.to_csv(results.summarystats)
-    make_plots(results)
+    make_summary_plots(results)
 
 
 def segment_video(args, app_config):

@@ -11,7 +11,7 @@ matplotlib.use('PDF')
 sns.set(color_codes=True)
 
 
-def make_plots(results: RecordingSessionData):
+def make_summary_plots(results: RecordingSessionData):
     """
     Produce summary plots for a recorded bout.
     :param results:

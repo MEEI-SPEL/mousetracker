@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import attr
+import pandas as pd
 
 
 @attr.s(frozen=True)
@@ -18,6 +19,43 @@ class EyeStats:
     angle = attr.ib(default=None)
     fitted_area = attr.ib(default=None)
     contour_area = attr.ib(default=None)
+
+
+def find_blinks(series: pd.Series, min_dist=120) -> np.ndarray:
+    """find all full blinks ( eye fully closed )"""
+    from core.util.detect_peaks import detect_peaks
+    temp = series.copy()
+    temp.loc[temp > 10] = 10
+    return detect_peaks(temp, mpd=min_dist, valley=True)
+
+
+def num_samples_for_duration(dur_msec: float, fs=240):
+    """returns an always-even sample length that covers the given duration"""
+    import math
+    dur_sec = dur_msec / 1000.0
+    n = math.floor(dur_sec * fs)
+    if n % 2 == 0:
+        return n
+    else:
+        return n + 1
+
+
+def window(series: pd.Series, idx: int, timedur: float):
+    nsamples = num_samples_for_duration(timedur)
+    start = idx - (nsamples // 2)
+    stop = idx + (nsamples // 2)
+    return np.arange(start, stop), series.iloc[start:stop].as_matrix()
+
+
+def make_windows(series: pd.Series, timedur: float, show=False):
+    if show:
+        import matplotlib.pyplot as plt
+        plt.plot(series)
+        plt.plot(series[find_blinks(series)], 'r^')
+        plt.xlabel('sample index')
+        plt.ylabel('scaled eye area')
+        plt.legend(('eye area', 'blink events'))
+    return [window(series, blink, timedur) for blink in find_blinks(series)]
 
 
 def compute_areas(frame) -> EyeStats:
