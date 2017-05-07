@@ -6,7 +6,7 @@ import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 from datetime import datetime
 
-plt.style.use('fivethirtyeight')
+#plt.style.use('fivethirtyeight')
 matplotlib.use('PDF')
 sns.set(color_codes=True)
 
