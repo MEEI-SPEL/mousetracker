@@ -5,8 +5,8 @@ Bout Analyzer.   Extracts bilateral whisking and eyeblink data from a video snip
 Usage:
     analyze_bout -h | --help
     analyze_bout --version
-    analyze_bout ([-i <input_file> | --input <input_file>] | [ --config <config_file> | --print_config] )
-                    [(-o <output_file> | --output <output_file>)] [(-v | --verbose)] [--clean]
+    analyze_bout ([-i <input_file> | --input <input_file>] | --print_config) [--config <config_file>]
+                 [(-o <output_file> | --output <output_file>)] [(-v | --verbose)] [--clean]
 
 Options:
     -h --help                   Show this screen and exit.
