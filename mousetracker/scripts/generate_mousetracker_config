@@ -1,0 +1,41 @@
+"""
+Generate Mousetracker Config. 
+
+Generates a config file template for specification of runtime parameters
+
+Usage:
+    generate_mousetracker_config.py -h | --help
+    generate_mousetracker_config.py --version
+    generate_mousetracker_config.py [(-o <output_file> | --output <output_file>)]
+
+Options:
+    -h --help                   Show this screen and exit.
+    -o --output=<output_file>   Specify a location to store the generated config file template results.
+"""
+import sys
+from os import path
+import shutil
+
+from mousetracker.core.base import modulePath
+from attrs_utils import from_docopt
+
+
+def main(inputargs):
+    args = from_docopt(docstring=__doc__, argv=inputargs)
+
+    if not path.isdir(args.output):
+        print("output is not a directory!")
+        sys.exit(1)
+    output_path = path.abspath(args.output)
+    template_path = path.join(modulePath,'resources','template.yaml')
+    try:
+        res=shutil.copy(template_path, path.join(output_path, 'mousetracker_config.yaml'))
+        print(f"Generated new config template at {res}.\n"
+              f"Edit the file to reflect your system, then pass it to analyze_bout with the --config option.")
+    except IOError as e:
+        print(e)
+        sys.exit(1)
+
+
+if __name__=="__main__":
+    sys.exit(main(sys.argv[1:] if len(sys.argv) > 1 else ""))

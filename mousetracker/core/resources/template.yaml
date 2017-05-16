@@ -1,0 +1,41 @@
+# operational defaults to describe hardware components in the system.
+
+
+# the optical specifications
+camera:
+  width: 1080
+  height: 720
+  framerate: 240
+  px2mm: 0.04
+# the subject specifications
+animal:
+  #  Valid species are 'rat' and 'mouse'
+  species: 'rat'
+  # Valid colors are 'white' and 'black'
+  whisker_color:  'white'
+  # Valid color is 'red'
+  eye_color: 'red'
+  # Any positive integer value is valid here
+  num_whiskers: 5
+# runtime constants
+system:
+  # the path to the python 2.7 installation (for whisk)
+  python27_path:
+  # the path to trace.py (part of whisk python API)
+  trace_path:
+  # obsolete.
+  avidemux_path:
+  # path to ffmpeg
+  ffmpeg_path:
+  # path to whisk binaries.
+  whisk_base_path:
+# storage constants define how output directories are named.
+storage:
+  root_label:       '.whisk-output-root'
+  output_root:      'whisk-output'
+  name_format:     '%d %b %y - %H%M'
+
+#analysis parameters.  Obsolete.
+bandpass:
+  low: 2 #in Hz
+  high: 50 #in Hz
