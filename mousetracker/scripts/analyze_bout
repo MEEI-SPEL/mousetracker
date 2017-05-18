@@ -141,8 +141,8 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
                 if ret and (curframe < nframes):
                     pb.update(curframe)
                     # split in half
-                    left_frame = frame[0:cropped_size[1], 0:cropped_size[0]]
-                    right_frame = frame[0:cropped_size[1], cropped_size[0]:size[0]]
+                    left_frame = frame[0:cropped_size[1], cropped_size[0]:size[0]]
+                    right_frame = frame[0:cropped_size[1], 0:cropped_size[0]]
                     # measure eye areas
                     left_eye = eyes.compute_areas(left_frame)
                     left_eye_renamed = {SideOfFace.left.name + "_" + k: v for k, v in left_eye.__dict__.items()}
@@ -171,17 +171,17 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             cv2.destroyAllWindows()
             # make checkpoint eye data
 
-            left.eye = left.eye.set_index('frameid')
-            left.eye[left.side.name + '_scaled'] = left.eye[left.side.name + '_fitted_area'] / max(
-                abs(left.eye[left.side.name + '_fitted_area'])) * 100
+        left.eye = left.eye.set_index('frameid')
+        left.eye[left.side.name + '_scaled'] = left.eye[left.side.name + '_fitted_area'] / max(
+            abs(left.eye[left.side.name + '_fitted_area'])) * 100
 
-            right.eye = right.eye.set_index('frameid')
-            right.eye[right.side.name + '_scaled'] = right.eye[right.side.name + '_fitted_area'] / max(
-                abs(right.eye[right.side.name + '_fitted_area'])) * 100
+        right.eye = right.eye.set_index('frameid')
+        right.eye[right.side.name + '_scaled'] = right.eye[right.side.name + '_fitted_area'] / max(
+            abs(right.eye[right.side.name + '_fitted_area'])) * 100
 
-            info('Saved eye data checkpoint file.')
-            left.eye.to_csv(left.eyecheck)
-            right.eye.to_csv(right.eyecheck)
+        info('Saved eye data checkpoint file.')
+        left.eye.to_csv(left.eyecheck)
+        right.eye.to_csv(right.eyecheck)
     else:
         info('Found existing split video.  Importing existing eye data checkpoint files.')
         left.eye = pd.read_csv(left.eyecheck)
