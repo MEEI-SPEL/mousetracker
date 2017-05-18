@@ -3,7 +3,7 @@ from collections import namedtuple
 from logging import info
 
 import pandas as pd
-
+import shutil
 from .base import *
 from .util.signal_processing import lowpass
 from .yaml_config import Config
@@ -49,15 +49,14 @@ def extract_whisk_data(video: VideoFileData, config, keep_files):
     :param keep_files:
     :return:
     """
-    base = config.system.whisk_base_path
-    trace_path = path.join(base, 'trace.exe')
+    trace_path = shutil.which('trace')
     trace_args = [video.name, video.whiskname]
-    measure_path = path.join(base, 'measure.exe')
+    measure_path = shutil.which('measure')
     measure_args = ['--face', video.side.name, video.whiskname, video.measname]
-    classify_path = path.join(base, 'classify.exe')
+    classify_path = shutil.which('classify')
     classify_args = [video.measname, video.measname, video.side.name, '--px2mm', str(config.camera.px2mm),
                      '-n', str(config.animal.num_whiskers)]
-    reclassify_path = path.join(base, 'reclassify.exe')
+    reclassify_path = shutil.which('reclassify.exe')
     reclassify_args = [video.measname, video.measname, '-n', '-1']
     if not (keep_files and path.exists(video.whiskname)):
         info(f'tracing whiskers for {video.labelname}')
