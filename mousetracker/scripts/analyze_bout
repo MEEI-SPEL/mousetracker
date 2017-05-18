@@ -41,12 +41,7 @@ from mousetracker.core.whiskers import extract_whisk_data
 KEEP_FILES = True
 
 
-def main(inputargs):
-    """
-    Application entry point.  Analyze a recorded bout based on the parameters laid out in a config file.
-    :param inputargs:
-    :return: A POSIX exit code.
-    """
+def __argparsing(inputargs:str):
     args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
     __check_requirements()
     info('read default hardware parameters.')
@@ -59,6 +54,16 @@ def main(inputargs):
     if args.clean:
         global KEEP_FILES  # ew.
         KEEP_FILES = False
+    return args, app_config
+
+
+def main(inputargs):
+    """
+    Application entry point.  Analyze a recorded bout based on the parameters laid out in a config file.
+    :param inputargs:
+    :return: A POSIX exit code.
+    """
+    args, app_config = __argparsing(inputargs=inputargs)
 
     info(f'processing file {path.split(args.input)[1]}')
     results = segment_video(args, app_config)

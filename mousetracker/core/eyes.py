@@ -23,7 +23,7 @@ class EyeStats:
 
 def find_blinks(series: pd.Series, min_dist=120) -> np.ndarray:
     """find all full blinks ( eye fully closed )"""
-    from core.util.detect_peaks import detect_peaks
+    from mousetracker.core.util.detect_peaks import detect_peaks
     temp = series.copy()
     temp.loc[temp > 10] = 10
     return detect_peaks(temp, mpd=min_dist, valley=True)

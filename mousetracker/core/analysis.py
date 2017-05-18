@@ -1,14 +1,13 @@
-from .base import *
+from mousetracker.core.base import *
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 from datetime import datetime
 
-#plt.style.use('fivethirtyeight')
+
 matplotlib.use('PDF')
-sns.set(color_codes=True)
+
 
 
 def make_summary_plots(results: RecordingSessionData):

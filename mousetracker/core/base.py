@@ -1,10 +1,11 @@
 import warnings
+from enum import Enum
 from logging import basicConfig, INFO
 from os import path
+
 import attr
 from attr.validators import instance_of
-from attrs_utils import ensure_enum, ensure_cls
-from enum import Enum
+from attrs_utils import ensure_enum
 
 
 class SideOfFace(Enum):

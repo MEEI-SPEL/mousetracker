@@ -4,16 +4,16 @@ from logging import info
 
 import pandas as pd
 import shutil
-from .base import *
-from .util.signal_processing import lowpass
-from .yaml_config import Config
+from mousetracker.core.base import *
+from mousetracker.core.util.signal_processing import lowpass
+from mousetracker.core.yaml_config import Config
 
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")
 
 
 def estimate_whisking_from_raw_whiskers(video: VideoFileData, config, keep_files):
     """
-
+    Extract the bulk pad displacement per frame from a whiskers file.
     :param video:
     :param config:
     :param keep_files:
@@ -43,7 +43,7 @@ def estimate_whisking_from_raw_whiskers(video: VideoFileData, config, keep_files
 
 def extract_whisk_data(video: VideoFileData, config, keep_files):
     """
-
+    Run the whisk code toolchain on a video file.  generate a whiskers and measurements file.
     :param video:
     :param config:
     :param keep_files:
@@ -112,6 +112,13 @@ def extract_whisk_data(video: VideoFileData, config, keep_files):
 
 
 def filter_raw(whiskdat: pd.DataFrame, params: Config, name: str) -> pd.DataFrame:
+    """
+    Apply a low-pass filter to whisker displacement measurements
+    :param whiskdat: 
+    :param params: 
+    :param name: 
+    :return: 
+    """
     fs = params.camera.framerate
     whiskdat = whiskdat.assign(mean_degrees_filtered=lowpass(data=whiskdat['mean_degrees'], fs=fs))
     whiskdat = whiskdat.assign(time=whiskdat['frameid'] / fs)
