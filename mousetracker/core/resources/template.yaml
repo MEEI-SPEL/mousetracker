@@ -23,19 +23,11 @@ system:
   python27_path:
   # the path to trace.py (part of whisk python API)
   trace_path:
-  # obsolete.
-  avidemux_path:
-  # path to ffmpeg
-  ffmpeg_path:
-  # path to whisk binaries.
-  whisk_base_path:
 # storage constants define how output directories are named.
 storage:
+  # the name of the file to create that marks a directory as a data directory
   root_label:       '.whisk-output-root'
+  # where to put stuff.
   output_root:      'whisk-output'
+  # how to name folders.
   name_format:     '%d %b %y - %H%M'
-
-#analysis parameters.  Obsolete.
-bandpass:
-  low: 2 #in Hz
-  high: 50 #in Hz

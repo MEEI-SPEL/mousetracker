@@ -32,7 +32,7 @@ import pandas as pd
 import progressbar
 from attrs_utils.interop import from_docopt
 from joblib import Parallel, delayed
-
+import shutil
 from mousetracker.core import eyes, yaml_config
 from mousetracker.core._version import __version__
 from mousetracker.core.base import *
@@ -210,6 +210,8 @@ def __align_timestamps(video, args, app_config):
     :param app_config:
     :return:
     """
+    import shutil
+    ffmpegpath = shutil.which('ffmpeg')
     name, ext = path.splitext(video)
     aligned = name + "-aligned" + ext
     if not (path.exists(aligned) and KEEP_FILES):
@@ -217,7 +219,7 @@ def __align_timestamps(video, args, app_config):
         if path.exists(aligned):
             remove(aligned)
         framerate = str(app_config.camera.framerate)
-        command = [app_config.system.ffmpeg_path, '-i', video, '-codec:v', 'mpeg4', '-r', framerate,
+        command = [ffmpegpath, '-i', video, '-codec:v', 'mpeg4', '-r', framerate,
                    '-qscale:v', '2', '-codec:a', 'copy', aligned]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return aligned if result.returncode == 0 else None
@@ -237,6 +239,13 @@ def __check_requirements():
     else:
         error(f"{system} is not supported (windows only for now)")
         sys.exit(1)
+    if not shutil.which('ffmpeg'):
+        error('ffmpeg is not installed or not on the system path!')
+        sys.exit(1)
+    if not all([shutil.which(x) for x in ('trace','classify','reclassify','measure')]):
+        error('whisk tracking binaries are not installed or not on the system path!')
+        sys.exit(1)
+
 
 
 def __validate_args(args, app_config):

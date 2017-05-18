@@ -15,18 +15,10 @@ animal:
   num_whiskers: 5
 # runtime constants
 system:
-  python27_path:  'C:\\Python27\\python.exe'
+  python27_path:  "C:\\Users\\VOYSEYG\\AppData\\Local\\Continuum\\Miniconda2\\python.exe"
   trace_path:     'C:\\Users\\VoyseyG\\Projects\\whisk\\python\\trace.py'
-  avidemux_path:  'C:\\Program Files\\Avidemux 2.6 - 64 bits\\avidemux_cli.exe'
-  ffmpeg_path:    'C:\\Users\\VoyseyG\\Projects\\mousetracker\\mousetracker\\core\\resources\\ffmpeg-win64\\bin\\ffmpeg.exe'
-  whisk_base_path:  'C:\\Program Files\\WhiskerTracking\\bin\\'
 # storage constants
 storage:
   root_label:       '.whisk-output-root'
   output_root:      'whisk-output'
-  name_format:     '%d %b %y - %H%M'
-
-#analysis parameters
-bandpass:
-  low: 2 #in Hz
-  high: 50 #in Hz
+  name_format:      '%d %b %y - %H%M'
