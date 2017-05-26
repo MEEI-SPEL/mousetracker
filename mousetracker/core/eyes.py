@@ -27,11 +27,12 @@ class EyeStats:
     contour_area = attr.ib(default=None)
 
 
-def find_blinks(series: pd.Series, min_dist: int = 120, percent_closed_threshold=10) -> np.ndarray:
+def find_blinks(series: pd.Series, min_dist: int = 120) -> np.ndarray:
     """find blinks (rapid eye closing events)"""
     temp = series.copy()
     # restrict search to only those peaks between 0% open and threshhold.
-    temp.loc[temp > percent_closed_threshold] = percent_closed_threshold
+    threshold = temp.mean() - 2*temp.std()
+    temp.loc[temp > threshold] = threshold
     return detect_peaks(temp, mpd=min_dist, valley=True)
 
 
@@ -56,19 +57,20 @@ def overlay_windows(windowdf:pd.DataFrame) -> pd.DataFrame:
     df = pd.DataFrame()
     for colname, series in windowdf.iteritems():
         df[colname] = series.reset_index(drop=True)
+    print(df.head())
     return df
 
 
-def make_windows(series: pd.Series, duration_ms: float, blink_threshold=10, show=False) -> [pd.Series]:
+def make_windows(series: pd.Series, duration_ms: float, show=False) -> [pd.Series]:
     if show:
         import matplotlib.pyplot as plt
         plt.plot(series)
-        plt.plot(series[find_blinks(series, percent_closed_threshold=blink_threshold)], 'r^')
+        plt.plot(series[find_blinks(series)], 'r^')
         plt.xlabel('sample index')
         plt.ylabel('scaled eye area')
         plt.legend(('eye area', 'blink events'))
     df = pd.DataFrame({f'blink_{i}': window(series, blink, duration_ms)
-                       for i, blink in enumerate(find_blinks(series, percent_closed_threshold=blink_threshold))})
+                       for i, blink in enumerate(find_blinks(series))})
     return df
     # return [window(series, blink, duration_ms) for blink in find_blinks(series, percent_closed_threshold=blink_threshold)]
 
