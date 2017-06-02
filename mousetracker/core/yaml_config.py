@@ -40,7 +40,8 @@ class System(object):
     System parameters
     """
     python27_path = attr.ib(validator=is_path_of_file)
-    trace_path = attr.ib(validator=is_path_of_file)
+    load_whiskers_path  = attr.ib(validator=is_path_of_file)
+    load_measurements_path  = attr.ib(validator=is_path_of_file)
 
 
 @attr.s(frozen=True)

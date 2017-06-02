@@ -31,7 +31,7 @@ def find_blinks(series: pd.Series, min_dist: int = 120) -> np.ndarray:
     """find blinks (rapid eye closing events)"""
     temp = series.copy()
     # restrict search to only those peaks between 0% open and threshhold.
-    threshold = temp.mean() - 2*temp.std()
+    threshold = temp.mean() - 2.5*temp.std()
     temp.loc[temp > threshold] = threshold
     return detect_peaks(temp, mpd=min_dist, valley=True)
 
@@ -54,14 +54,15 @@ def window(series: pd.Series, center_idx: int, timedur: float) -> pd.Series:
     # return np.arange(start, stop), series.iloc[start:stop].as_matrix()
 
 def overlay_windows(windowdf:pd.DataFrame) -> pd.DataFrame:
-    df = pd.DataFrame()
-    for colname, series in windowdf.iteritems():
-        df[colname] = series.reset_index(drop=True)
-    print(df.head())
-    return df
+    # df = pd.DataFrame()
+    # for colname, series in windowdf.iteritems():
+    #     df[colname] = series.copy().reset_index(drop=True)
+    # print(df.head())
+    # return df
+    return pd.DataFrame({n: v.reset_index(drop=True) for n,v in windowdf.iteritems()}).apply(lambda x: pd.Series(x.dropna().values))
 
 
-def make_windows(series: pd.Series, duration_ms: float, show=False) -> [pd.Series]:
+def make_windows(series: pd.Series, duration_ms: float, show=False) -> [pd.DataFrame]:
     if show:
         import matplotlib.pyplot as plt
         plt.plot(series)

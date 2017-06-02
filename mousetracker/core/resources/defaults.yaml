@@ -16,7 +16,8 @@ animal:
 # runtime constants
 system:
   python27_path:  "C:\\Users\\VOYSEYG\\AppData\\Local\\Continuum\\Miniconda2\\python.exe"
-  trace_path:     'C:\\Users\\VoyseyG\\Projects\\whisk\\python\\trace.py'
+  load_whiskers_path: "C:\\Users\\VoyseyG\\Projects\\whisk\\python\\load_whiskers.py"
+  load_measurements_path: "C:\\Users\\VoyseyG\\Projects\\whisk\\python\\load_measurements.py"
 # storage constants
 storage:
   root_label:       '.whisk-output-root'

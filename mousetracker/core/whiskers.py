@@ -11,6 +11,28 @@ from mousetracker.core.yaml_config import Config
 timedata = namedtuple("timedata", "frameid,mean_degrees,num_whiskers,stderr")
 
 
+def estimate_whisking_from_measurements(video: VideoFileData, config, keep_files):
+    """
+    Extract statistics from the Measurements file
+    :param video: 
+    :param config: 
+    :param keep_files: 
+    :return: 
+    """
+    checkpoint = video.whiskraw
+    if not (path.isfile(checkpoint) and keep_files):
+        call = [config.system.python27_path, config.system.load_measurements_path, '--input', video.whiskname, '-o',
+                checkpoint]
+        info(f'extracting whisker movement from {video.labelname}')
+        data = subprocess.run(call, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if data.returncode == 0:
+            data = pd.read_csv(checkpoint)
+        else:
+            raise IOError(f"failed to extract from {video.labelname}: {repr(data.stderr)}")
+    else:
+        info(f"found existing whisker data for {video.labelname}")
+        data = pd.read_csv(checkpoint)
+
 def estimate_whisking_from_raw_whiskers(video: VideoFileData, config, keep_files):
     """
     Extract the bulk pad displacement per frame from a whiskers file.
@@ -21,7 +43,7 @@ def estimate_whisking_from_raw_whiskers(video: VideoFileData, config, keep_files
     """
     checkpoint = video.whiskraw
     if not (path.isfile(checkpoint) and keep_files):
-        call = [config.system.python27_path, config.system.trace_path, '--input', video.whiskname, '-o', checkpoint]
+        call = [config.system.python27_path, config.system.load_whiskers_path, '--input', video.whiskname, '-o', checkpoint]
         info(f'extracting whisker movement from {video.labelname}')
         data = subprocess.run(call, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if data.returncode == 0:
