@@ -20,18 +20,20 @@ class EyeStats:
     :param fitted_area: The computed area of the fitted ellipse, in  pixels^2.
     :param contour_area: The raw area of the contour of the eye, in pixels^2. 
     """
-    center = attr.ib(default=None)
-    size = attr.ib(default=None)
+    center_x = attr.ib(default=None)
+    center_y = attr.ib(default=None)
+    minor_axis = attr.ib(default=None)
+    major_axis = attr.ib(default=None)
     angle = attr.ib(default=None)
     fitted_area = attr.ib(default=None)
     contour_area = attr.ib(default=None)
 
 
-def find_blinks(series: pd.Series, min_dist: int = 120) -> np.ndarray:
+def find_blinks(series: pd.Series, min_dist: int = 120, std_num:float=2.5) -> np.ndarray:
     """find blinks (rapid eye closing events)"""
     temp = series.copy()
-    # restrict search to only those peaks between 0% open and threshhold.
-    threshold = temp.mean() - 2.5*temp.std()
+    # restrict search to only those peaks between 0 and `std_num` number of standard deviations from the mean.
+    threshold = temp.mean() - std_num*temp.std()
     temp.loc[temp > threshold] = threshold
     return detect_peaks(temp, mpd=min_dist, valley=True)
 
@@ -100,8 +102,10 @@ def _contour_to_ellipse(opened):
         largest_contour = max(contours, key=cv2.contourArea)
         center, size, angle = cv2.fitEllipse(largest_contour)
         fitted_area = np.pi * (size[0] / 2) * (size[1] / 2)
-        return EyeStats(center=center,
-                        size=size,
+        return EyeStats(center_x=center[0],
+                        center_y=center[1],
+                        minor_axis=size[0],
+                        major_axis=size[1],
                         angle=angle,
                         fitted_area=fitted_area,
                         contour_area=cv2.contourArea(largest_contour)

@@ -41,46 +41,36 @@ from mousetracker.core.whiskers import extract_whisk_data
 KEEP_FILES = True
 
 
-def __argparsing(inputargs:str):
-    args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
-    __check_requirements()
-    info('read default hardware parameters.')
-    app_config = yaml_config.load(args.config)
-    if args.print_config:
-        print("Detected Configuration Parameters: ")
-        pprint.pprint(attr.asdict(app_config), depth=5)
-        return 0
-    __validate_args(args, app_config)
-    if args.clean:
-        global KEEP_FILES  # ew.
-        KEEP_FILES = False
-    return args, app_config
-
-
 def main(inputargs):
     """
     Application entry point.  Analyze a recorded bout based on the parameters laid out in a config file.
     :param inputargs:
     :return: A POSIX exit code.
     """
-    args, app_config = __argparsing(inputargs=inputargs)
+    args, app_config = __parse_args(inputargs=inputargs)
 
     info(f'processing file {path.split(args.input)[1]}')
     results = segment_video(args, app_config)
     info('Extracting whisk data for each eye')
-    #Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
+    # Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
     for f in results.videos:
         extract_whisk_data(f, app_config, KEEP_FILES)
     analyze_bout(results=results)
 
 
 def analyze_bout(results: RecordingSessionData):
-    info('Making summary plots...')
-    from mousetracker.core.analysis import make_summary_plots
+    """
+    Combine left and right data into a summary data frame, and save it.
+    :param results: 
+    :return: 
+    """
     # join left and right dataframes into one summary dataframe for the entire bout
     wholeface = pd.concat([pd.read_csv(f.summaryfile) for f in results.videos], axis=1)
     wholeface.to_csv(results.summarystats)
-    make_summary_plots(results)
+
+    # from mousetracker.core.analysis import make_summary_plots
+    # info('Making summary plots...')
+    # make_summary_plots(results)
 
 
 def segment_video(args, app_config):
@@ -174,19 +164,9 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             vw_left.release()
             vw_right.release()
             cv2.destroyAllWindows()
+            
             # make checkpoint eye data
-
-        left.eye = left.eye.set_index('frameid')
-        left.eye[left.side.name + '_scaled'] = left.eye[left.side.name + '_fitted_area'] / max(
-            abs(left.eye[left.side.name + '_fitted_area'])) * 100
-
-        right.eye = right.eye.set_index('frameid')
-        right.eye[right.side.name + '_scaled'] = right.eye[right.side.name + '_fitted_area'] / max(
-            abs(right.eye[right.side.name + '_fitted_area'])) * 100
-
-        info('Saved eye data checkpoint file.')
-        left.eye.to_csv(left.eyecheck)
-        right.eye.to_csv(right.eyecheck)
+            __align_eyes(left, right)
     else:
         info('Found existing split video.  Importing existing eye data checkpoint files.')
         left.eye = pd.read_csv(left.eyecheck)
@@ -205,6 +185,34 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             raise IOError(f"Video pre-processing failed on file {args.input}")
     else:
         raise IOError(f"Video pre-processing failed on file {args.input}")
+
+
+def __align_eyes(left: VideoFileData, right: VideoFileData) -> None:
+    """
+    Clean up eye data frames. Add a new column that scales the area by the largest value across both eyes.
+    :param left: 
+    :param right: 
+    :return: 
+    """
+    left.eye = left.eye.set_index('frameid')
+    right.eye = right.eye.set_index('frameid')
+
+    left_fitted_ellipse = left.side.name + '_fitted_area'
+    right_fitted_ellipse = right.side.name + '_fitted_area'
+
+    max_left = max(abs(left.eye[left_fitted_ellipse]))
+    max_right = max(abs(right.eye[right_fitted_ellipse]))
+    scaling_factor = max(max_left, max_right)
+
+    # add new column
+    left.eye[left.side.name + '_scaled'] = (left.eye[left_fitted_ellipse] / scaling_factor) * 100
+
+    # add new column
+    right.eye[right.side.name + '_scaled'] = (right.eye[right_fitted_ellipse] / scaling_factor) * 100
+
+    info('Saved eye data checkpoint file.')
+    left.eye.to_csv(left.eyecheck)
+    right.eye.to_csv(right.eyecheck)
 
 
 def __align_timestamps(video, args, app_config):
@@ -247,10 +255,9 @@ def __check_requirements():
     if not shutil.which('ffmpeg'):
         error('ffmpeg is not installed or not on the system path!')
         sys.exit(1)
-    if not all([shutil.which(x) for x in ('trace','classify','reclassify','measure')]):
+    if not all([shutil.which(x) for x in ('trace', 'classify', 'reclassify', 'measure')]):
         error('whisk tracking binaries are not installed or not on the system path!')
         sys.exit(1)
-
 
 
 def __validate_args(args, app_config):
@@ -285,6 +292,22 @@ def __touch(fname, times=None):
     """
     with open(fname, 'a+'):
         utime(fname, times)
+
+
+def __parse_args(inputargs: str):
+    args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
+    __check_requirements()
+    info('read default hardware parameters.')
+    app_config = yaml_config.load(args.config)
+    if args.print_config:
+        print("Detected Configuration Parameters: ")
+        pprint.pprint(attr.asdict(app_config), depth=5)
+        return 0
+    __validate_args(args, app_config)
+    if args.clean:
+        global KEEP_FILES  # ew.
+        KEEP_FILES = False
+    return args, app_config
 
 
 if __name__ == "__main__":
