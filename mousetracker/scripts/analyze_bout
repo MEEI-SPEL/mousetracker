@@ -52,7 +52,7 @@ def main(inputargs):
     info(f'processing file {path.split(args.input)[1]}')
     results = segment_video(args, app_config)
     info('Extracting whisk data for each eye')
-    # Parallel(n_jobs=cpu_count() - 1)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
+    Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
     for f in results.videos:
         extract_whisk_data(f, app_config, KEEP_FILES)
     analyze_bout(results=results)
@@ -98,6 +98,34 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
     :param app_config:
     :return:
     """
+
+    def align_eyes(left: VideoFileData, right: VideoFileData) -> None:
+        """
+        Clean up eye data frames. Add a new column that scales the area by the largest value across both eyes.
+        :param left: 
+        :param right: 
+        :return: 
+        """
+        left.eye = left.eye.set_index('frameid')
+        right.eye = right.eye.set_index('frameid')
+
+        left_fitted_ellipse = left.side.name + '_fitted_area'
+        right_fitted_ellipse = right.side.name + '_fitted_area'
+
+        max_left = max(abs(left.eye[left_fitted_ellipse]))
+        max_right = max(abs(right.eye[right_fitted_ellipse]))
+        scaling_factor = max(max_left, max_right)
+
+        # add new column
+        left.eye[left.side.name + '_scaled'] = (left.eye[left_fitted_ellipse] / scaling_factor) * 100
+
+        # add new column
+        right.eye[right.side.name + '_scaled'] = (right.eye[right_fitted_ellipse] / scaling_factor) * 100
+
+        info('Saved eye data checkpoint file.')
+        left.eye.to_csv(left.eyecheck)
+        right.eye.to_csv(right.eyecheck)
+
     # grab the video
     cap = cv2.VideoCapture(args.input)
     # initialize storage containers
@@ -164,9 +192,9 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             vw_left.release()
             vw_right.release()
             cv2.destroyAllWindows()
-            
+
             # make checkpoint eye data
-            __align_eyes(left, right)
+            align_eyes(left, right)
     else:
         info('Found existing split video.  Importing existing eye data checkpoint files.')
         left.eye = pd.read_csv(left.eyecheck)
@@ -187,32 +215,7 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
         raise IOError(f"Video pre-processing failed on file {args.input}")
 
 
-def __align_eyes(left: VideoFileData, right: VideoFileData) -> None:
-    """
-    Clean up eye data frames. Add a new column that scales the area by the largest value across both eyes.
-    :param left: 
-    :param right: 
-    :return: 
-    """
-    left.eye = left.eye.set_index('frameid')
-    right.eye = right.eye.set_index('frameid')
 
-    left_fitted_ellipse = left.side.name + '_fitted_area'
-    right_fitted_ellipse = right.side.name + '_fitted_area'
-
-    max_left = max(abs(left.eye[left_fitted_ellipse]))
-    max_right = max(abs(right.eye[right_fitted_ellipse]))
-    scaling_factor = max(max_left, max_right)
-
-    # add new column
-    left.eye[left.side.name + '_scaled'] = (left.eye[left_fitted_ellipse] / scaling_factor) * 100
-
-    # add new column
-    right.eye[right.side.name + '_scaled'] = (right.eye[right_fitted_ellipse] / scaling_factor) * 100
-
-    info('Saved eye data checkpoint file.')
-    left.eye.to_csv(left.eyecheck)
-    right.eye.to_csv(right.eyecheck)
 
 
 def __align_timestamps(video, args, app_config):
