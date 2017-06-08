@@ -24,13 +24,23 @@ import math
 import subprocess
 from joblib import Parallel, delayed
 import cv2
+import numpy as np
 from multiprocessing import cpu_count
 from attrs_utils.interop import from_docopt
+import shlex
+from os import path
 
 MAX_CPUS = math.ceil(cpu_count()/2)
 FRAMERATE = 240
+
 def main(inputargs):
     args = from_docopt(docstring=__doc__, argv=inputargs)
+    files = chunk(args.input)
+    # Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
+    for f in files:
+        commandstring = shlex.split(f'analyze_bout -i \"{f}\"')
+        result = subprocess.run(commandstring, stdout=subprocess.PIPE)
+        print(f'{f} completed with return code {result.returncode}')
 
 def chunk(source:str) -> [str]:
     """
@@ -38,10 +48,27 @@ def chunk(source:str) -> [str]:
     :param source: 
     :return: 
     """
+    name, ext = path.splitext(path.basename(source))
     cap = cv2.VideoCapture(source)
+
     framecount = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration_sec = framecount / FRAMERATE
-    nchunks = duration_sec
+    nchunks = math.ceil(duration_sec/MAX_CPUS)
+    chunk_duration = duration_sec/nchunks
+    start_times = np.linspace(start=0, stop=duration_sec-chunk_duration, num=nchunks)
+    stop_times = np.linspace(start=chunk_duration, stop=duration_sec, num=nchunks)
+
+    retval = []
+    for start,stop in zip(start_times,stop_times):
+        output_name = f'{name}_{start:2.2f}_{stop:2.2f}{ext}'
+        commandstring = shlex.split(f'ffmpeg -i \"{source}\" -ss {start} -t {stop} \"{output_name}\"') # ffmpeg -i source-file.foo -ss 0 -t 600 first-10-min.m4v'
+        commandstring = [c.replace(' ', '\ ') for c in commandstring]
+        result = subprocess.run(commandstring, stdout=subprocess.PIPE)
+        if result.returncode != 0:
+            raise IOError('ffmpeg failed to run')
+        retval.append(output_name)
+
+    return retval
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:] if len(sys.argv) > 1 else "-h"))

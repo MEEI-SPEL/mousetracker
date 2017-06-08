@@ -53,8 +53,8 @@ def main(inputargs):
     results = segment_video(args, app_config)
     info('Extracting whisk data for each eye')
     Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
-    for f in results.videos:
-        extract_whisk_data(f, app_config, KEEP_FILES)
+    # for f in results.videos:
+    #     extract_whisk_data(f, app_config, KEEP_FILES)
     analyze_bout(results=results)
 
 

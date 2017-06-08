@@ -6,7 +6,8 @@ setup(
     version=__version__,
     packages=find_packages(),
     scripts=['mousetracker/scripts/analyze_bout',
-             'mousetracker/scripts/generate_mousetracker_config'
+             'mousetracker/scripts/generate_mousetracker_config',
+             'mousetracker/scripts/mousetracker_batch',
             ],
     url='https://github.com/MEEI-SPEL/mousetracker',
     license='',
