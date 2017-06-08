@@ -29,20 +29,31 @@ from multiprocessing import cpu_count
 from attrs_utils.interop import from_docopt
 import shlex
 from os import path
-
+import asyncio
 MAX_CPUS = math.ceil(cpu_count()/2)
 FRAMERATE = 240
 
 def main(inputargs):
     args = from_docopt(docstring=__doc__, argv=inputargs)
-    files = chunk(args.input)
-    # Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
-    for f in files:
-        commandstring = shlex.split(f'analyze_bout -i \"{f}\"')
-        result = subprocess.run(commandstring, stdout=subprocess.PIPE)
-        print(f'{f} completed with return code {result.returncode}')
+    loop = asyncio.get_event_loop()
+    files = loop.run_until_complete(chunk(args.input))
 
-def chunk(source:str) -> [str]:
+    loop.close()
+    #files = chunk(args.input)
+    # Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
+    # for f in files:
+    #     commandstring = shlex.split(f'analyze_bout -i \"{f}\"')
+    #     result = subprocess.run(commandstring, stdout=subprocess.PIPE)
+    #     print(f'{f} completed with return code {result.returncode}')
+
+
+
+async def run_analyze(videofile:str) -> None:
+    commandstring = shlex.split(f'analyze_bout -i \"{videofile}\"')
+    result = subprocess.run(commandstring, stdout=subprocess.PIPE)
+    print(f'{videofile} completed with return code {result.returncode}')
+
+async def chunk(source:str) -> [str]:
     """
     Break a video into sections to maximize CPU use.
     :param source: 
@@ -67,8 +78,18 @@ def chunk(source:str) -> [str]:
         if result.returncode != 0:
             raise IOError('ffmpeg failed to run')
         retval.append(output_name)
-
     return retval
+
+async def split_file(source, start, stop):
+    name, ext = path.splitext(path.basename(source))
+    output_name = f'{name}_{start:2.2f}_{stop:2.2f}{ext}'
+    commandstring = shlex.split(
+        f'ffmpeg -i \"{source}\" -ss {start} -t {stop} \"{output_name}\"')  # ffmpeg -i source-file.foo -ss 0 -t 600 first-10-min.m4v'
+    commandstring = [c.replace(' ', '\ ') for c in commandstring]
+    result = subprocess.run(commandstring, stdout=subprocess.PIPE)
+    if result.returncode != 0:
+        raise IOError('ffmpeg failed to run')
+    yield
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:] if len(sys.argv) > 1 else "-h"))
