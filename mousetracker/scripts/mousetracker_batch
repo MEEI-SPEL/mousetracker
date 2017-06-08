@@ -28,32 +28,27 @@ import numpy as np
 from multiprocessing import cpu_count
 from attrs_utils.interop import from_docopt
 import shlex
-from os import path
-import asyncio
-MAX_CPUS = math.ceil(cpu_count()/2)
+from os import path, environ
+from importlib.machinery import SourceFileLoader
+
+MAX_CPUS = math.ceil(cpu_count() / 2)
 FRAMERATE = 240
+
+ab_path = path.join(path.dirname(path.abspath(__file__)), "analyze_bout")
+ab = SourceFileLoader('analyze_bout', ab_path).load_module()
 
 def main(inputargs):
     args = from_docopt(docstring=__doc__, argv=inputargs)
-    loop = asyncio.get_event_loop()
-    files = loop.run_until_complete(chunk(args.input))
 
-    loop.close()
-    #files = chunk(args.input)
+    files = chunk(args.input)
     # Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
-    # for f in files:
-    #     commandstring = shlex.split(f'analyze_bout -i \"{f}\"')
-    #     result = subprocess.run(commandstring, stdout=subprocess.PIPE)
-    #     print(f'{f} completed with return code {result.returncode}')
+    for f in files:
+        commandstring = shlex.split(f'-i \"{f}\"')
+        result = ab.main(commandstring)
+        print(f'{f} completed with return code {result.returncode}')
 
 
-
-async def run_analyze(videofile:str) -> None:
-    commandstring = shlex.split(f'analyze_bout -i \"{videofile}\"')
-    result = subprocess.run(commandstring, stdout=subprocess.PIPE)
-    print(f'{videofile} completed with return code {result.returncode}')
-
-async def chunk(source:str) -> [str]:
+def chunk(source: str) -> [str]:
     """
     Break a video into sections to maximize CPU use.
     :param source: 
@@ -64,15 +59,15 @@ async def chunk(source:str) -> [str]:
 
     framecount = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration_sec = framecount / FRAMERATE
-    nchunks = math.ceil(duration_sec/MAX_CPUS)
-    chunk_duration = duration_sec/nchunks
-    start_times = np.linspace(start=0, stop=duration_sec-chunk_duration, num=nchunks)
+    nchunks = math.ceil(duration_sec / MAX_CPUS)
+    chunk_duration = duration_sec / nchunks
+    start_times = np.linspace(start=0, stop=duration_sec - chunk_duration, num=nchunks)
     stop_times = np.linspace(start=chunk_duration, stop=duration_sec, num=nchunks)
 
     retval = []
-    for start,stop in zip(start_times,stop_times):
+    for start, stop in zip(start_times, stop_times):
         output_name = f'{name}_{start:2.2f}_{stop:2.2f}{ext}'
-        commandstring = shlex.split(f'ffmpeg -i \"{source}\" -ss {start} -t {stop} \"{output_name}\"') # ffmpeg -i source-file.foo -ss 0 -t 600 first-10-min.m4v'
+        commandstring = shlex.split(f'ffmpeg -i \"{source}\" -ss {start} -t {stop} \"{output_name}\"')
         commandstring = [c.replace(' ', '\ ') for c in commandstring]
         result = subprocess.run(commandstring, stdout=subprocess.PIPE)
         if result.returncode != 0:
@@ -80,16 +75,6 @@ async def chunk(source:str) -> [str]:
         retval.append(output_name)
     return retval
 
-async def split_file(source, start, stop):
-    name, ext = path.splitext(path.basename(source))
-    output_name = f'{name}_{start:2.2f}_{stop:2.2f}{ext}'
-    commandstring = shlex.split(
-        f'ffmpeg -i \"{source}\" -ss {start} -t {stop} \"{output_name}\"')  # ffmpeg -i source-file.foo -ss 0 -t 600 first-10-min.m4v'
-    commandstring = [c.replace(' ', '\ ') for c in commandstring]
-    result = subprocess.run(commandstring, stdout=subprocess.PIPE)
-    if result.returncode != 0:
-        raise IOError('ffmpeg failed to run')
-    yield
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:] if len(sys.argv) > 1 else "-h"))
