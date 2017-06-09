@@ -50,12 +50,13 @@ def main(inputargs):
     args, app_config = __parse_args(inputargs=inputargs)
 
     info(f'processing file {path.split(args.input)[1]}')
-    results = segment_video(args, app_config)
+    results = prepare_video(args, app_config)
     info('Extracting whisk data for each eye')
     Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
     # for f in results.videos:
     #     extract_whisk_data(f, app_config, KEEP_FILES)
     analyze_bout(results=results)
+    return 0
 
 
 def analyze_bout(results: RecordingSessionData):
@@ -73,7 +74,7 @@ def analyze_bout(results: RecordingSessionData):
     # make_summary_plots(results)
 
 
-def segment_video(args, app_config):
+def prepare_video(args, app_config):
     """
     Break up a long recording into multiple small ones.  Collate split videos into one container per bout.
     :param args:

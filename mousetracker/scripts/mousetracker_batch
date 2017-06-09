@@ -27,6 +27,7 @@ from importlib.machinery import SourceFileLoader
 from multiprocessing import cpu_count
 from os import path
 from joblib import Parallel, delayed
+from datetime import datetime
 import cv2
 import numpy as np
 from attrs_utils.interop import from_docopt
@@ -37,45 +38,39 @@ FRAMERATE = 240
 ab_path = path.join(path.dirname(path.abspath(__file__)), "analyze_bout")
 ab = SourceFileLoader('analyze_bout', ab_path).load_module()
 
+
 def main(inputargs):
     args = from_docopt(docstring=__doc__, argv=inputargs)
-    times = time_slices(args.input)
-    files = chunk(args.input)
-    # Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
+    tic = datetime.now()
+    print(f'began run: {datetime.time(tic)}')
+    files = Parallel(n_jobs=MAX_CPUS)(
+        delayed(extract_slice)(args.input, start, stop) for start, stop in time_slices(args.input))
+    Parallel(n_jobs=MAX_CPUS)(delayed(process)(f) for f in files)
+    toc = datetime.now()
+    print(f'ended run: {datetime.time(toc)}\nelapsed: {toc-tic}')
 
-    #Parallel(n_jobs=MAX_CPUS)(delayed(chunk)(args.input))
-    for f in files:
-        process(f)
 
 def process(splitfile):
+    print(f'processing {splitfile}')
     commandstring = shlex.split(f'-i \"{splitfile}\"')
     result = ab.main(commandstring)
-    print(f'{splitfile} completed with return code {result.returncode}')
+    print(f'{splitfile} completed with return code {result}')
 
-
-def chunk(source: str) -> [str]:
-    """
-    Break a video into sections to maximize CPU use.
-    :param source: 
-    :return: 
-    """
-    retval = []
-    for start, stop in time_slices(source):
-        retval.append(extract_slice(source, start, stop))
-    return retval
 
 def extract_slice(source, start, stop):
     name, ext = path.splitext(path.basename(source))
     output_name = f'{name}_{start:2.2f}_{stop:2.2f}{ext}'
+    print(f'chunking {output_name}')
     commandstring = shlex.split(f'ffmpeg -i \"{source}\" -ss {start} -t {stop} \"{output_name}\"')
     commandstring = [c.replace(' ', '\ ') for c in commandstring]
-    result = subprocess.run(commandstring, stdout=subprocess.PIPE)
+    result = subprocess.run(commandstring, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode != 0:
         raise IOError('ffmpeg failed to run')
     else:
         return output_name
 
-def time_slices(source)->[()]:
+
+def time_slices(source) -> [()]:
     cap = cv2.VideoCapture(source)
     framecount = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration_sec = framecount / FRAMERATE
@@ -85,6 +80,7 @@ def time_slices(source)->[()]:
     stop_times = np.linspace(start=chunk_duration, stop=duration_sec, num=nchunks)
     cap.release()
     return zip(start_times, stop_times)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:] if len(sys.argv) > 1 else "-h"))
