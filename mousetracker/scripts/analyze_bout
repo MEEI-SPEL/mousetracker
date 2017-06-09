@@ -21,10 +21,10 @@ Options:
 """
 import platform
 import pprint
+import shutil
 import subprocess
 import sys
 from logging import info, error, getLogger, ERROR
-from multiprocessing import cpu_count
 from os import access, W_OK, utime, remove, mkdir
 
 import cv2
@@ -32,7 +32,7 @@ import pandas as pd
 import progressbar
 from attrs_utils.interop import from_docopt
 from joblib import Parallel, delayed
-import shutil
+
 from mousetracker.core import eyes, yaml_config
 from mousetracker.core._version import __version__
 from mousetracker.core.base import *
