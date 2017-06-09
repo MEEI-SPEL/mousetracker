@@ -50,12 +50,12 @@ def main(inputargs):
     args, app_config = __parse_args(inputargs=inputargs)
 
     info(f'processing file {path.split(args.input)[1]}')
-    results = prepare_video(args, app_config)
+    eye_results = process_eyes(args, app_config)
     info('Extracting whisk data for each eye')
-    Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in results.videos)
+    Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in eye_results.videos)
     # for f in results.videos:
     #     extract_whisk_data(f, app_config, KEEP_FILES)
-    analyze_bout(results=results)
+    analyze_bout(results=eye_results)
     return 0
 
 
@@ -74,7 +74,7 @@ def analyze_bout(results: RecordingSessionData):
     # make_summary_plots(results)
 
 
-def prepare_video(args, app_config):
+def process_eyes(args, app_config):
     """
     Break up a long recording into multiple small ones.  Collate split videos into one container per bout.
     :param args:
@@ -82,16 +82,14 @@ def prepare_video(args, app_config):
     :return:
     """
     name, ext = path.splitext(path.basename(args.input))
-    cap = cv2.VideoCapture(args.input)
-    framecount = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    chunk = Chunk(left=path.join(args.output, name + "-left" + ext),
-                  right=path.join(args.output, name + "-right" + ext),
-                  start=0,
-                  stop=framecount)
-    return RecordingSessionData(videos=split_and_extract_blink(args, app_config, chunk))
+
+    left_file = path.join(args.output, name + "-left" + ext)
+    right_file = path.join(args.output, name + "-right" + ext)
+
+    return RecordingSessionData(videos=split_and_extract_blink(args, app_config, left_file, right_file))
 
 
-def split_and_extract_blink(args, app_config, chunk: Chunk):
+def split_and_extract_blink(args, app_config, left_path, right_path):
     """
     Split a video into left and right face sides for whisking detection, and extract eye areas along the way.
     :param chunk:
@@ -133,13 +131,13 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
     nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     left_column_names = ['frameid', *[SideOfFace.left.name + "_" + x for x in attr.asdict(eyes.EyeStats()).keys()]]
     right_column_names = ['frameid', *[SideOfFace.right.name + "_" + x for x in attr.asdict(eyes.EyeStats()).keys()]]
-    left = VideoFileData(name=chunk.left, side=SideOfFace.left, eye=pd.DataFrame(columns=left_column_names),
+    left = VideoFileData(name=left_path, side=SideOfFace.left, eye=pd.DataFrame(columns=left_column_names),
                          nframes=nframes)
-    right = VideoFileData(name=chunk.right, side=SideOfFace.right, eye=pd.DataFrame(columns=right_column_names),
+    right = VideoFileData(name=right_path, side=SideOfFace.right, eye=pd.DataFrame(columns=right_column_names),
                           nframes=nframes)
 
     # jump to the right frame
-    cap.set(1, chunk.start)
+    # cap.set(1, 0)
     codec = cv2.VideoWriter_fourcc(*'MPEG')
     framerate = app_config.camera.framerate
 
@@ -214,9 +212,6 @@ def split_and_extract_blink(args, app_config, chunk: Chunk):
             raise IOError(f"Video pre-processing failed on file {args.input}")
     else:
         raise IOError(f"Video pre-processing failed on file {args.input}")
-
-
-
 
 
 def __align_timestamps(video, args, app_config):

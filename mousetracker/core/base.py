@@ -51,16 +51,6 @@ class RecordingSessionData(object):
         self.summarystats = path.join(self.rootdir, "summary_data.csv") if self.rootdir else None
 
 
-@attr.s
-class Chunk(object):
-    """
-    This container holds the file paths to the split and aligned video files to be analyzed,
-    as well as start and stop frame IDs if the recording needs to be analyzed in chunks.
-    """
-    left = attr.ib(validator=instance_of(str))
-    right = attr.ib(validator=instance_of(str))
-    start = attr.ib(validator=instance_of(int))
-    stop = attr.ib(validator=instance_of(int))
 
 
 modulePath = path.dirname(path.abspath(__file__))
