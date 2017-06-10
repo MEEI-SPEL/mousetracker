@@ -26,6 +26,7 @@ import subprocess
 import sys
 from logging import info, error, getLogger, ERROR
 from os import access, W_OK, utime, remove, mkdir
+import shlex
 
 import cv2
 import pandas as pd
@@ -37,6 +38,7 @@ from mousetracker.core import eyes, yaml_config
 from mousetracker.core._version import __version__
 from mousetracker.core.base import *
 from mousetracker.core.whiskers import extract_whisk_data
+from mousetracker.core.yaml_config import Config
 
 KEEP_FILES = True
 
@@ -74,7 +76,7 @@ def analyze_bout(results: RecordingSessionData):
     # make_summary_plots(results)
 
 
-def process_eyes(args, app_config):
+def process_eyes(args, app_config:Config):
     """
     Break up a long recording into multiple small ones.  Collate split videos into one container per bout.
     :param args:
@@ -87,6 +89,30 @@ def process_eyes(args, app_config):
     right_file = path.join(args.output, name + "-right" + ext)
 
     return RecordingSessionData(videos=split_and_extract_blink(args, app_config, left_file, right_file))
+
+def split(args, app_config:Config) -> (str,str):
+    """
+    Split a full-face recording into a left and right side.
+    :param args: 
+    :param app_config: 
+    :return: 
+    """
+    name, ext = path.splitext(path.basename(args.input))
+    left_file = path.join(args.output, name + "-left" + ext)
+    right_file = path.join(args.output, name + "-right" + ext)
+    ffmpegpath = shutil.which('ffmpeg')
+    halfwidth = app_config.camera.width / 2
+    height = app_config.camera.height
+    right_box = f"{halfwidth}:{height}:0:0"
+    left_box = f"{halfwidth}:{height}:{halfwidth}:0"
+    commandstr = shlex.split(f'{ffmpegpath} -i \"{args.input}\" '
+                             f'-filter:v \"crop={left_box}\" -filter:a copy \"{left_file}\"'
+                             f'-filter:v \"crop={right_box}\" -filter:a copy \"{right_file}\"')
+    result = subprocess.run(commandstr, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        raise IOError(f'ffmpeg failed to split file {args.input}!')
+    else:
+        return left_file, right_file
 
 
 def split_and_extract_blink(args, app_config, left_path, right_path):
