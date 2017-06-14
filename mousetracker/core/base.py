@@ -51,8 +51,6 @@ class RecordingSessionData(object):
         self.summarystats = path.join(self.rootdir, "summary_data.csv") if self.rootdir else None
 
 
-
-
 modulePath = path.dirname(path.abspath(__file__))
 
 # PyYAML has some warnings we'll suppress

@@ -1,3 +1,4 @@
+pandas
 attrs >= 16.3
 -e git+https://github.com/gvoysey/attrs-utils=attrs_utils
 joblib >= 0.10

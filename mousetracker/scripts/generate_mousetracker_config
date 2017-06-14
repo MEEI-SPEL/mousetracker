@@ -16,17 +16,18 @@ Options:
 import sys
 from os import path
 import shutil
+from typing import List
 
 from mousetracker.core.base import modulePath
 from attrs_utils import from_docopt
 
 
-def main(inputargs):
+def main(inputargs: List[str]) -> int:
     args = from_docopt(docstring=__doc__, argv=inputargs)
 
     if not path.isdir(args.output):
         print("output is not a directory!")
-        sys.exit(1)
+        return 1
     output_path = path.abspath(args.output)
     template_path = path.join(modulePath,'resources','template.yaml')
     try:
@@ -35,7 +36,8 @@ def main(inputargs):
               f"Edit the file to reflect your system, then pass it to analyze_bout with the --config option.")
     except IOError as e:
         print(e)
-        sys.exit(1)
+        return 1
+    return 0
 
 
 if __name__=="__main__":

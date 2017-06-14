@@ -21,29 +21,31 @@ Options:
 """
 import platform
 import pprint
+import shlex
 import shutil
 import subprocess
 import sys
 from logging import info, error, getLogger, ERROR
-from os import access, W_OK, utime, remove, mkdir
-import shlex
+from os import access, W_OK, utime, remove, mkdir, path
+from typing import List, Tuple, Optional
 
 import cv2
 import pandas as pd
 import progressbar
+import attr
 from attrs_utils.interop import from_docopt
 from joblib import Parallel, delayed
 
 from mousetracker.core import eyes, yaml_config
 from mousetracker.core._version import __version__
-from mousetracker.core.base import *
+from mousetracker.core.base import RecordingSessionData, SideOfFace, VideoFileData
 from mousetracker.core.whiskers import extract_whisk_data
 from mousetracker.core.yaml_config import Config
 
 KEEP_FILES = True
 
 
-def main(inputargs):
+def main(inputargs: List[str]) -> int:
     """
     Application entry point.  Analyze a recorded bout based on the parameters laid out in a config file.
     :param inputargs:
@@ -61,7 +63,7 @@ def main(inputargs):
     return 0
 
 
-def analyze_bout(results: RecordingSessionData):
+def analyze_bout(results: RecordingSessionData) -> None:
     """
     Combine left and right data into a summary data frame, and save it.
     :param results: 
@@ -76,7 +78,7 @@ def analyze_bout(results: RecordingSessionData):
     # make_summary_plots(results)
 
 
-def process_eyes(args, app_config:Config):
+def process_eyes(args: InputArgs, app_config: Config) -> RecordingSessionData:
     """
     Break up a long recording into multiple small ones.  Collate split videos into one container per bout.
     :param args:
@@ -90,7 +92,8 @@ def process_eyes(args, app_config:Config):
 
     return RecordingSessionData(videos=split_and_extract_blink(args, app_config, left_file, right_file))
 
-def split(args, app_config:Config) -> (str,str):
+
+def split(args: InputArgs, app_config: Config) -> Tuple[str, str]:
     """
     Split a full-face recording into a left and right side.
     :param args: 
@@ -115,7 +118,7 @@ def split(args, app_config:Config) -> (str,str):
         return left_file, right_file
 
 
-def split_and_extract_blink(args, app_config, left_path, right_path):
+def split_and_extract_blink(args: InputArgs, app_config: Config, left_path: str, right_path: str) -> None:
     """
     Split a video into left and right face sides for whisking detection, and extract eye areas along the way.
     :param chunk:
@@ -240,7 +243,7 @@ def split_and_extract_blink(args, app_config, left_path, right_path):
         raise IOError(f"Video pre-processing failed on file {args.input}")
 
 
-def __align_timestamps(video, args, app_config):
+def __align_timestamps(video: str, args: InputArgs, app_config: Config) -> Optional[str]:
     """
     reencode a video file with ffmpeg to align timestamps for whisker extraction.
     :param video:
@@ -266,7 +269,7 @@ def __align_timestamps(video, args, app_config):
         return aligned
 
 
-def __check_requirements():
+def __check_requirements() -> None:
     """
     This code relies on a variety of external tools to be available.  If they aren't, warn and barf.
     :return: diagnostic information about what's missing.
@@ -285,7 +288,7 @@ def __check_requirements():
         sys.exit(1)
 
 
-def __validate_args(args, app_config):
+def __validate_args(args: InputArgs, app_config: Config) -> None:
     """
     Makes sure the arguments passed in are reasonable.  Sets the default value for output, if required.  Configures
     logging level.
@@ -312,14 +315,14 @@ def __validate_args(args, app_config):
         raise FileNotFoundError(f'User-supplied configuration file {args.config} not found!')
 
 
-def __touch(fname, times=None):
+def __touch(fname: str, times: Tuple[float, float] = None):
     """ As coreutils touch.
     """
     with open(fname, 'a+'):
         utime(fname, times)
 
 
-def __parse_args(inputargs: str):
+def __parse_args(inputargs: List[str]) -> Tuple[InputArgs, Config]:
     args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
     __check_requirements()
     info('read default hardware parameters.')
@@ -327,7 +330,7 @@ def __parse_args(inputargs: str):
     if args.print_config:
         print("Detected Configuration Parameters: ")
         pprint.pprint(attr.asdict(app_config), depth=5)
-        return 0
+        sys.exit(0)
     __validate_args(args, app_config)
     if args.clean:
         global KEEP_FILES  # ew.
@@ -337,4 +340,4 @@ def __parse_args(inputargs: str):
 
 if __name__ == "__main__":
     # guarantee that we pass the right number of arguments.
-    sys.exit(main(sys.argv[1:] if len(sys.argv) > 1 else "-h"))
+    sys.exit(main(sys.argv[1:] if len(sys.argv) > 1 else ["-h"]))

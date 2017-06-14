@@ -31,15 +31,17 @@ from datetime import datetime
 import cv2
 import numpy as np
 from attrs_utils.interop import from_docopt
+from typing import List, Optional, Tuple
 
+
+# Totally hacky.
 MAX_CPUS = math.ceil(cpu_count() / 2)
 FRAMERATE = 240
-
 ab_path = path.join(path.dirname(path.abspath(__file__)), "analyze_bout")
 ab = SourceFileLoader('analyze_bout', ab_path).load_module()
 
 
-def main(inputargs):
+def main(inputargs: List[str]) -> int:
     args = from_docopt(docstring=__doc__, argv=inputargs)
     tic = datetime.now()
     print(f'began run: {datetime.time(tic)}')
@@ -48,16 +50,17 @@ def main(inputargs):
     Parallel(n_jobs=MAX_CPUS)(delayed(process)(f) for f in files)
     toc = datetime.now()
     print(f'ended run: {datetime.time(toc)}\nelapsed: {toc-tic}')
+    return 0
 
 
-def process(splitfile):
+def process(splitfile: str) -> None:
     print(f'processing {splitfile}')
     commandstring = shlex.split(f'-i \"{splitfile}\"')
     result = ab.main(commandstring)
     print(f'{splitfile} completed with return code {result}')
 
 
-def extract_slice(source, start, stop):
+def extract_slice(source: str, start: float, stop: float) -> Optional[str]:
     name, ext = path.splitext(path.basename(source))
     output_name = f'{name}_{start:2.2f}_{stop:2.2f}{ext}'
     print(f'chunking {output_name}')
@@ -70,7 +73,7 @@ def extract_slice(source, start, stop):
         return output_name
 
 
-def time_slices(source) -> [()]:
+def time_slices(source: str) -> List[Tuple[np.int64, np.int64]]:
     cap = cv2.VideoCapture(source)
     framecount = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration_sec = framecount / FRAMERATE
@@ -79,7 +82,7 @@ def time_slices(source) -> [()]:
     start_times = np.linspace(start=0, stop=duration_sec - chunk_duration, num=nchunks)
     stop_times = np.linspace(start=chunk_duration, stop=duration_sec, num=nchunks)
     cap.release()
-    return zip(start_times, stop_times)
+    return list(zip(start_times, stop_times))
 
 
 if __name__ == "__main__":

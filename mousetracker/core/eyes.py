@@ -1,12 +1,14 @@
 """
 Detection and Analysis of eyes in video frames.
 """
+import math
+from typing import List
+
+import attr
 import cv2
 import numpy as np
-import attr
-from attr.validators import instance_of
 import pandas as pd
-import math
+
 from mousetracker.core.util.detect_peaks import detect_peaks
 
 
@@ -29,11 +31,11 @@ class EyeStats:
     contour_area = attr.ib(default=None)
 
 
-def find_blinks(series: pd.Series, min_dist: int = 120, std_num:float=2.5) -> np.ndarray:
+def find_blinks(series: pd.Series, min_dist: int = 120, std_num: float = 2.5) -> np.ndarray:
     """find blinks (rapid eye closing events)"""
     temp = series.copy()
     # restrict search to only those peaks between 0 and `std_num` number of standard deviations from the mean.
-    threshold = temp.mean() - std_num*temp.std()
+    threshold = temp.mean() - std_num * temp.std()
     temp.loc[temp > threshold] = threshold
     return detect_peaks(temp, mpd=min_dist, valley=True)
 
@@ -55,16 +57,18 @@ def window(series: pd.Series, center_idx: int, timedur: float) -> pd.Series:
     return series.iloc[start:stop]
     # return np.arange(start, stop), series.iloc[start:stop].as_matrix()
 
-def overlay_windows(windowdf:pd.DataFrame) -> pd.DataFrame:
+
+def overlay_windows(windowdf: pd.DataFrame) -> pd.DataFrame:
     # df = pd.DataFrame()
     # for colname, series in windowdf.iteritems():
     #     df[colname] = series.copy().reset_index(drop=True)
     # print(df.head())
     # return df
-    return pd.DataFrame({n: v.reset_index(drop=True) for n,v in windowdf.iteritems()}).apply(lambda x: pd.Series(x.dropna().values))
+    return pd.DataFrame({n: v.reset_index(drop=True) for n, v in windowdf.iteritems()}).apply(
+        lambda x: pd.Series(x.dropna().values))
 
 
-def make_windows(series: pd.Series, duration_ms: float, show=False) -> [pd.DataFrame]:
+def make_windows(series: pd.Series, duration_ms: float, show=False) -> List[pd.DataFrame]:
     if show:
         import matplotlib.pyplot as plt
         plt.plot(series)
