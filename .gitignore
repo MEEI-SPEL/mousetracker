@@ -1,5 +1,5 @@
 *~
-
+.mypy_cache/
 ffmpeg-win64/
 *.parameters
 *.detectorbank
