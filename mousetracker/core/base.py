@@ -23,18 +23,19 @@ class VideoFileData(object):
     """
     name = attr.ib(validator=instance_of(str))
     side = attr.ib(convert=ensure_enum(SideOfFace))
-    eye = attr.ib()
-    nframes = attr.ib(validator=instance_of(int))
+    eye = attr.ib(default=None)
 
     def __attrs_post_init__(self):
         name, ext = path.splitext(self.name)
         self.basename = name
-        self.whiskname = name + ".whiskers"
-        self.measname = name + ".measurements"
-        self.eyecheck = name + "-eye-checkpoint.csv"
-        self.whiskraw = name + "-whisk-raw.csv"
-        self.whiskcheck = name + "-whisk-checkpoint.csv"
-        self.summaryfile = name + "-summary.csv"
+        self.greyscale = f'{name}-greyscale{ext}'
+        self.aligned = f'{name}-aligned{ext}'
+        self.whiskname = f'{name}.whiskers'
+        self.measname = f'{name}.measurements'
+        self.eyecheck = f'{name}-eye-checkpoint.csv'
+        self.whiskraw = f'{name}-whisk-raw.csv'
+        self.whiskcheck = f'{name}-whisk-checkpoint.csv'
+        self.summaryfile = f'{name}-summary.csv'
         self.labelname = path.splitext(path.basename(name))[0]
 
 

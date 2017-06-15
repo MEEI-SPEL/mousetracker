@@ -115,7 +115,13 @@ def _contour_to_ellipse(opened):
                         contour_area=cv2.contourArea(largest_contour)
                         )
     except ValueError:
-        return EyeStats()
+        return EyeStats(center_x=np.nan,
+                        center_y=np.nan,
+                        minor_axis=np.nan,
+                        major_axis=np.nan,
+                        angle=np.nan,
+                        fitted_area=np.nan,
+                        contour_area=np.nan)
 
 
 def _morph_and_smooth(thresh1):

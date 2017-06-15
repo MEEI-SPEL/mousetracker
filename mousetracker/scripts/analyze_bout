@@ -27,7 +27,7 @@ import subprocess
 import sys
 from logging import info, error, getLogger, ERROR
 from os import access, W_OK, utime, remove, mkdir, path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any, Dict
 
 import cv2
 import pandas as pd
@@ -35,6 +35,7 @@ import progressbar
 import attr
 from attrs_utils.interop import from_docopt
 from joblib import Parallel, delayed
+import numpy as np
 
 from mousetracker.core import eyes, yaml_config
 from mousetracker.core._version import __version__
@@ -53,17 +54,22 @@ def main(inputargs: List[str]) -> int:
     """
     args, app_config = __parse_args(inputargs=inputargs)
 
-    info(f'processing file {path.split(args.input)[1]}')
-    eye_results = process_eyes(args, app_config)
-    info('Extracting whisk data for each eye')
-    Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in eye_results.videos)
-    # for f in results.videos:
-    #     extract_whisk_data(f, app_config, KEEP_FILES)
-    analyze_bout(results=eye_results)
+    side_files = split(args, app_config)
+    for side in side_files:
+        greyscale_and_extract_blink(side, app_config)
+        realign(side,app_config)
+        extract_whisk_data(side, app_config, KEEP_FILES)
+    # info(f'processing file {path.split(args.input)[1]}')
+    # eye_results = process_eyes(args, app_config)
+    # info('Extracting whisk data for each eye')
+    # Parallel(n_jobs=2)(delayed(extract_whisk_data)(f, app_config, KEEP_FILES) for f in eye_results.videos)
+    # # for f in results.videos:
+    # #     extract_whisk_data(f, app_config, KEEP_FILES)
+    # analyze_bout(results=eye_results)
     return 0
 
 
-def analyze_bout(results: RecordingSessionData) -> None:
+def summarize_results(results: RecordingSessionData) -> None:
     """
     Combine left and right data into a summary data frame, and save it.
     :param results: 
@@ -78,7 +84,7 @@ def analyze_bout(results: RecordingSessionData) -> None:
     # make_summary_plots(results)
 
 
-def process_eyes(args: InputArgs, app_config: Config) -> RecordingSessionData:
+def process_eyes(args: Any, app_config: Config) -> RecordingSessionData:
     """
     Break up a long recording into multiple small ones.  Collate split videos into one container per bout.
     :param args:
@@ -93,32 +99,129 @@ def process_eyes(args: InputArgs, app_config: Config) -> RecordingSessionData:
     return RecordingSessionData(videos=split_and_extract_blink(args, app_config, left_file, right_file))
 
 
-def split(args: InputArgs, app_config: Config) -> Tuple[str, str]:
+def split(args: Any, app_config: Config) -> Tuple[VideoFileData, VideoFileData]:
     """
     Split a full-face recording into a left and right side.
-    :param args: 
-    :param app_config: 
-    :return: 
+    Uses FFMPEG and all avaialble cores in parallel.  
     """
     name, ext = path.splitext(path.basename(args.input))
     left_file = path.join(args.output, name + "-left" + ext)
     right_file = path.join(args.output, name + "-right" + ext)
-    ffmpegpath = shutil.which('ffmpeg')
-    halfwidth = app_config.camera.width / 2
-    height = app_config.camera.height
-    right_box = f"{halfwidth}:{height}:0:0"
-    left_box = f"{halfwidth}:{height}:{halfwidth}:0"
-    commandstr = shlex.split(f'{ffmpegpath} -i \"{args.input}\" '
-                             f'-filter:v \"crop={left_box}\" -filter:a copy \"{left_file}\"'
-                             f'-filter:v \"crop={right_box}\" -filter:a copy \"{right_file}\"')
-    result = subprocess.run(commandstr, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if result.returncode != 0:
-        raise IOError(f'ffmpeg failed to split file {args.input}!')
+    if not all(path.isfile(x) for x in (left_file, right_file)):
+        ffmpegpath = shutil.which('ffmpeg')
+        halfwidth = int(app_config.camera.width / 2)
+        height = int(app_config.camera.height)
+        right_box = f"{halfwidth}:{height}:0:0"
+        left_box = f"{halfwidth}:{height}:{halfwidth}:0"
+        commandstr = shlex.split(f'\"{ffmpegpath}\" -i \"{args.input}\" '
+                                 f'-filter:v \"crop={left_box}\" -filter:a copy \"{left_file}\" '
+                                 f'-filter:v \"crop={right_box}\" -filter:a copy \"{right_file}\" ')
+        result = subprocess.run(commandstr, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            raise IOError(f'ffmpeg failed to split file {args.input}!\n\t{result.stderr}')
     else:
-        return left_file, right_file
+        return (VideoFileData(name=left_file, side=SideOfFace.left),
+               VideoFileData(name=right_file, side=SideOfFace.right))
 
 
-def split_and_extract_blink(args: InputArgs, app_config: Config, left_path: str, right_path: str) -> None:
+def greyscale_and_extract_blink(filedata:VideoFileData, app_config: Config) -> None:
+    """
+    
+    :param filepath: 
+    :param side: 
+    :param app_config: 
+    :param outfile: 
+    :return: 
+    """
+    # column_names = ['frameid', *[filedata.side.name + "_" + x for x in attr.asdict(eyes.EyeStats()).keys()]]
+    # filedata.eye = pd.DataFrame(columns=column_names)
+    if path.isfile(filedata.greyscale) and KEEP_FILES:
+        info(f'Found existing file {filedata.greyscale}')
+        return
+
+    def extract_blink(curframe:int, frame:np.ndarray, side:SideOfFace):
+
+        eyedata = eyes.compute_areas(frame)
+        #eyedata_renamed = {side.name + "_" + k: v for k, v in eyedata.__dict__.items()}
+        return {'frameid': curframe, **attr.asdict(eyedata)}
+
+    def rename_blinks(blinks:List[Dict], side:SideOfFace) -> List[Dict]:
+        def rename_key(key:str, side:SideOfFace) -> str:
+            if key != "frameid":
+                return f'{side.name}_{key}'
+            else:
+                return key
+        retval = []
+        for row in blinks:
+            retval.append({rename_key(k,side): v for k, v in row.items()})
+        return retval
+
+    # grab the video
+    cap = cv2.VideoCapture(filedata.name)
+    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    codec = cv2.VideoWriter_fourcc(*'MPEG')
+    nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    framerate = app_config.camera.framerate
+    curframe = 0
+    vw = cv2.VideoWriter(filename=filedata.greyscale, fourcc=codec, fps=framerate, frameSize=size,
+                         isColor=False)
+
+    with progressbar.ProgressBar(min_value=0, max_value=nframes) as pb:
+        blinks = []
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if ret and (curframe < nframes):
+                pb.update(curframe)
+                # measure eye areas and store them in a dataframe
+                blinks.append(extract_blink(curframe=curframe, frame=frame, side=filedata.side))
+                # greyscale and invert for whisk detection
+                frame = cv2.bitwise_not(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+                # write out
+                vw.write(frame)
+                curframe += 1
+
+            else:
+                break
+        # clean up, because openCV is stupid and doesn't implement `with ...`
+        cap.release()
+        vw.release()
+        cv2.destroyAllWindows()
+    renamed = rename_blinks(blinks, filedata.side)
+    filedata.eye = pd.DataFrame(renamed)
+    filedata.eye.to_csv(filedata.eyecheck)
+
+
+
+def align_eyes(left: VideoFileData, right: VideoFileData) -> None:
+    """
+    Clean up eye data frames. Add a new column that scales the area by the largest value across both eyes.
+    :param left: 
+    :param right: 
+    :return: 
+    """
+    left.eye = left.eye.set_index('frameid')
+    right.eye = right.eye.set_index('frameid')
+
+    left_fitted_ellipse = left.side.name + '_fitted_area'
+    right_fitted_ellipse = right.side.name + '_fitted_area'
+
+    max_left = max(abs(left.eye[left_fitted_ellipse]))
+    max_right = max(abs(right.eye[right_fitted_ellipse]))
+    scaling_factor = max(max_left, max_right)
+
+    # add new column
+    left.eye[left.side.name + '_scaled'] = (left.eye[left_fitted_ellipse] / scaling_factor) * 100
+
+    # add new column
+    right.eye[right.side.name + '_scaled'] = (right.eye[right_fitted_ellipse] / scaling_factor) * 100
+
+    info('Saved eye data checkpoint file.')
+    left.eye.to_csv(left.eyecheck)
+    right.eye.to_csv(right.eyecheck)
+
+
+def split_and_extract_blink(args, app_config, left_path, right_path):
     """
     Split a video into left and right face sides for whisking detection, and extract eye areas along the way.
     :param chunk:
@@ -126,33 +229,6 @@ def split_and_extract_blink(args: InputArgs, app_config: Config, left_path: str,
     :param app_config:
     :return:
     """
-
-    def align_eyes(left: VideoFileData, right: VideoFileData) -> None:
-        """
-        Clean up eye data frames. Add a new column that scales the area by the largest value across both eyes.
-        :param left: 
-        :param right: 
-        :return: 
-        """
-        left.eye = left.eye.set_index('frameid')
-        right.eye = right.eye.set_index('frameid')
-
-        left_fitted_ellipse = left.side.name + '_fitted_area'
-        right_fitted_ellipse = right.side.name + '_fitted_area'
-
-        max_left = max(abs(left.eye[left_fitted_ellipse]))
-        max_right = max(abs(right.eye[right_fitted_ellipse]))
-        scaling_factor = max(max_left, max_right)
-
-        # add new column
-        left.eye[left.side.name + '_scaled'] = (left.eye[left_fitted_ellipse] / scaling_factor) * 100
-
-        # add new column
-        right.eye[right.side.name + '_scaled'] = (right.eye[right_fitted_ellipse] / scaling_factor) * 100
-
-        info('Saved eye data checkpoint file.')
-        left.eye.to_csv(left.eyecheck)
-        right.eye.to_csv(right.eyecheck)
 
     # grab the video
     cap = cv2.VideoCapture(args.input)
@@ -243,7 +319,28 @@ def split_and_extract_blink(args: InputArgs, app_config: Config, left_path: str,
         raise IOError(f"Video pre-processing failed on file {args.input}")
 
 
-def __align_timestamps(video: str, args: InputArgs, app_config: Config) -> Optional[str]:
+def realign(video:VideoFileData, app_config: Config) -> None:
+    """
+    reencode a video file with ffmpeg to align timestamps for whisker extraction.    
+    """
+    import shutil
+    ffmpegpath = shutil.which('ffmpeg')
+
+    if not (path.exists(video.aligned) and KEEP_FILES):
+        info(f'aligning timestamps and creating {video.aligned}')
+        if path.exists(video.aligned):
+            remove(video.aligned)
+        framerate = str(app_config.camera.framerate)
+        command = [ffmpegpath, '-i', video.greyscale, '-codec:v', 'mpeg4', '-r', framerate,
+                   '-qscale:v', '2', '-codec:a', 'copy', video.aligned]
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            raise IOError(f'could not align {video.name}')
+    else:
+        info(f'found previously aligned timestamps for {video.aligned}')
+
+
+def __align_timestamps(video: str, args: Any, app_config: Config) -> Optional[str]:
     """
     reencode a video file with ffmpeg to align timestamps for whisker extraction.
     :param video:
@@ -288,7 +385,7 @@ def __check_requirements() -> None:
         sys.exit(1)
 
 
-def __validate_args(args: InputArgs, app_config: Config) -> None:
+def __validate_args(args: Any, app_config: Config) -> None:
     """
     Makes sure the arguments passed in are reasonable.  Sets the default value for output, if required.  Configures
     logging level.
@@ -322,7 +419,7 @@ def __touch(fname: str, times: Tuple[float, float] = None):
         utime(fname, times)
 
 
-def __parse_args(inputargs: List[str]) -> Tuple[InputArgs, Config]:
+def __parse_args(inputargs: List[str]) -> Tuple[Any, Config]:
     args = from_docopt(docstring=__doc__, argv=inputargs, version=__version__)
     __check_requirements()
     info('read default hardware parameters.')

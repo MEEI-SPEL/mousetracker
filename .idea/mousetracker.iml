@@ -6,7 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/mousetracker" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/mousetracker/core/resources/ffmpeg-win64" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.6.0 virtualenv at ~/.local/share/virtualenvs/mousetracker-hWa6mG55" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.6.0 (C:\Users\VOYSEYG\AppData\Local\Continuum\Anaconda3\python.exe)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TestRunnerService">

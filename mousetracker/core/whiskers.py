@@ -72,7 +72,7 @@ def extract_whisk_data(video: VideoFileData, config, keep_files):
     :return:
     """
     trace_path = shutil.which('trace')
-    trace_args = [video.name, video.whiskname]
+    trace_args = [video.aligned, video.whiskname]
     measure_path = shutil.which('measure')
     measure_args = ['--face', video.side.name, video.whiskname, video.measname]
     classify_path = shutil.which('classify')
