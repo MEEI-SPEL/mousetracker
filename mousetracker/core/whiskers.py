@@ -2,6 +2,7 @@ import subprocess
 from collections import namedtuple
 from logging import info
 
+import os
 import pandas as pd
 import shutil
 from mousetracker.core.base import *

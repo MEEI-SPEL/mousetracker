@@ -28,12 +28,14 @@ import sys
 from logging import info, error, getLogger, ERROR
 from os import access, W_OK, utime, remove, mkdir, path
 from typing import List, Tuple, Optional, Any, Dict
+from datetime import datetime
 
 import cv2
 import pandas as pd
 import progressbar
 import attr
 from attrs_utils.interop import from_docopt
+from multiprocessing import cpu_count
 from joblib import Parallel, delayed
 import numpy as np
 
@@ -52,13 +54,18 @@ def main(inputargs: List[str]) -> int:
     :param inputargs:
     :return: A POSIX exit code.
     """
+    tic = datetime.now()
     args, app_config = __parse_args(inputargs=inputargs)
-
     side_files = split(args, app_config)
-    for side in side_files:
-        greyscale_and_extract_blink(side, app_config)
-        realign(side,app_config)
-        extract_whisk_data(side, app_config, KEEP_FILES)
+    Parallel(n_jobs=cpu_count())(delayed(greyscale_and_extract_blink)(x, app_config) for x in side_files)
+    Parallel(n_jobs=cpu_count())(delayed(realign)(x, app_config) for x in side_files)
+    Parallel(n_jobs=cpu_count())(delayed(extract_whisk_data)(x, app_config,KEEP_FILES) for x in side_files)
+    toc = datetime.now()
+    print(f"elapsed clock time: {toc-tic}")
+    # for side in side_files:
+    #     greyscale_and_extract_blink(side, app_config)
+    #     realign(side,app_config)
+    #     extract_whisk_data(side, app_config, KEEP_FILES)
     # info(f'processing file {path.split(args.input)[1]}')
     # eye_results = process_eyes(args, app_config)
     # info('Extracting whisk data for each eye')
@@ -119,6 +126,8 @@ def split(args: Any, app_config: Config) -> Tuple[VideoFileData, VideoFileData]:
         result = subprocess.run(commandstr, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
             raise IOError(f'ffmpeg failed to split file {args.input}!\n\t{result.stderr}')
+        return (VideoFileData(name=left_file, side=SideOfFace.left),
+                VideoFileData(name=right_file, side=SideOfFace.right))
     else:
         return (VideoFileData(name=left_file, side=SideOfFace.left),
                VideoFileData(name=right_file, side=SideOfFace.right))
@@ -135,9 +144,7 @@ def greyscale_and_extract_blink(filedata:VideoFileData, app_config: Config) -> N
     """
     # column_names = ['frameid', *[filedata.side.name + "_" + x for x in attr.asdict(eyes.EyeStats()).keys()]]
     # filedata.eye = pd.DataFrame(columns=column_names)
-    if path.isfile(filedata.greyscale) and KEEP_FILES:
-        info(f'Found existing file {filedata.greyscale}')
-        return
+
 
     def extract_blink(curframe:int, frame:np.ndarray, side:SideOfFace):
 
@@ -156,40 +163,46 @@ def greyscale_and_extract_blink(filedata:VideoFileData, app_config: Config) -> N
             retval.append({rename_key(k,side): v for k, v in row.items()})
         return retval
 
-    # grab the video
-    cap = cv2.VideoCapture(filedata.name)
-    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    codec = cv2.VideoWriter_fourcc(*'MPEG')
-    nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    framerate = app_config.camera.framerate
-    curframe = 0
-    vw = cv2.VideoWriter(filename=filedata.greyscale, fourcc=codec, fps=framerate, frameSize=size,
-                         isColor=False)
 
-    with progressbar.ProgressBar(min_value=0, max_value=nframes) as pb:
-        blinks = []
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if ret and (curframe < nframes):
-                pb.update(curframe)
-                # measure eye areas and store them in a dataframe
-                blinks.append(extract_blink(curframe=curframe, frame=frame, side=filedata.side))
-                # greyscale and invert for whisk detection
-                frame = cv2.bitwise_not(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
-                # write out
-                vw.write(frame)
-                curframe += 1
+    if path.isfile(filedata.greyscale) and path.isfile(filedata.eyecheck) and KEEP_FILES:
+        info(f'Found existing file {filedata.greyscale}')
+        filedata.eye = pd.read_csv(filedata.eyecheck)
+    else:
+        # grab the video
+        cap = cv2.VideoCapture(filedata.name)
+        size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        curframe = 0
+        vw = cv2.VideoWriter(filename=filedata.greyscale,
+                             fourcc=cv2.VideoWriter_fourcc(*'MPEG'),
+                             fps=app_config.camera.framerate,
+                             frameSize=size,
+                             isColor=False)
 
-            else:
-                break
-        # clean up, because openCV is stupid and doesn't implement `with ...`
-        cap.release()
-        vw.release()
-        cv2.destroyAllWindows()
-    renamed = rename_blinks(blinks, filedata.side)
-    filedata.eye = pd.DataFrame(renamed)
-    filedata.eye.to_csv(filedata.eyecheck)
+        with progressbar.ProgressBar(min_value=0, max_value=nframes) as pb:
+            blinks = []
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if ret and (curframe < nframes):
+                    pb.update(curframe)
+                    # measure eye areas and store them in a dataframe
+                    blinks.append(extract_blink(curframe=curframe, frame=frame, side=filedata.side))
+                    # greyscale and invert for whisk detection
+                    frame = cv2.bitwise_not(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+                    # write out
+                    vw.write(frame)
+                    curframe += 1
+
+                else:
+                    break
+            # clean up, because openCV is stupid and doesn't implement `with ...`
+            cap.release()
+            vw.release()
+            cv2.destroyAllWindows()
+        renamed = rename_blinks(blinks, filedata.side)
+        filedata.eye = pd.DataFrame(renamed)
+        filedata.eye.to_csv(filedata.eyecheck)
 
 
 
