@@ -32,7 +32,7 @@ import cv2
 import numpy as np
 from attrs_utils.interop import from_docopt
 from typing import List, Optional, Tuple
-
+import attr
 
 # Totally hacky.
 MAX_CPUS = math.ceil(cpu_count() / 2)
@@ -47,15 +47,19 @@ def main(inputargs: List[str]) -> int:
     print(f'began run: {datetime.time(tic)}')
     files = Parallel(n_jobs=MAX_CPUS)(
         delayed(extract_slice)(args.input, start, stop) for start, stop in time_slices(args.input))
-    Parallel(n_jobs=MAX_CPUS)(delayed(process)(f) for f in files)
+    Parallel(n_jobs=MAX_CPUS)(delayed(process)(f, args.config) for f in files)
     toc = datetime.now()
     print(f'ended run: {datetime.time(toc)}\nelapsed: {toc-tic}')
     return 0
 
 
-def process(splitfile: str) -> None:
+def process(splitfile: str, config) -> None:
     print(f'processing {splitfile}')
-    commandstring = shlex.split(f'-i \"{splitfile}\"')
+    command = f'-i \"{splitfile}\"'
+    if config != None:
+        command = f"{command} --config \"{config}\""
+    commandstring = shlex.split(command)
+
     result = ab.main(commandstring)
     print(f'{splitfile} completed with return code {result}')
 

@@ -60,6 +60,9 @@ def estimate_whisking_from_raw_whiskers(video: VideoFileData, config, keep_files
     side.columns = (side.columns[0], *[video.side.name+'_'+x for x in side.columns[1:]])
     side.to_csv(video.whiskcheck)
     side = side.set_index('frameid')
+    # eeeew.
+    if path.isfile(video.eyecheck) and video.eye is None:
+        video.eye = pd.read_csv(video.eyecheck)
     joined = side.join(video.eye)
     joined.to_csv(video.summaryfile)
 

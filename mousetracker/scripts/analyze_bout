@@ -62,6 +62,7 @@ def main(inputargs: List[str]) -> int:
     Parallel(n_jobs=cpu_count())(delayed(extract_whisk_data)(x, app_config,KEEP_FILES) for x in side_files)
     toc = datetime.now()
     print(f"elapsed clock time: {toc-tic}")
+    summarize_results(RecordingSessionData(videos=side_files))
     # for side in side_files:
     #     greyscale_and_extract_blink(side, app_config)
     #     realign(side,app_config)
